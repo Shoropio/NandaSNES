@@ -1,4 +1,4 @@
-package com.nandanes.emu
+﻿package com.nandanes.emu
 
 import android.view.MotionEvent
 import androidx.compose.foundation.background
@@ -197,8 +197,8 @@ fun EmulatorOverlay(
                 editorLabel = "Start / Select"
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    RetroPillButton("SELECT", SnesKey.SELECT, onPress, onRelease, centerButtonWidth, centerButtonHeight, palette.center, centerAlpha)
-                    RetroPillButton("START", SnesKey.START, onPress, onRelease, centerButtonWidth, centerButtonHeight, palette.center, centerAlpha)
+                    RetroSystemGlyphButton("\u25A1", SnesKey.SELECT, onPress, onRelease, centerButtonHeight, centerAlpha)
+                    RetroSystemGlyphButton("\u25B7", SnesKey.START, onPress, onRelease, centerButtonHeight, centerAlpha)
                 }
             }
         }
@@ -235,7 +235,7 @@ fun EmulatorOverlay(
                             modifier = Modifier.weight(1f),
                             accent = Color(0xFF2B3D5C)
                         ) {
-                            Text("Save States")
+                            Text("Estados guardados")
                         }
                     }
                     Row(
@@ -287,7 +287,7 @@ fun EmulatorOverlay(
             OverlayPanelMode.SAVES -> {
                 OverlayBottomSheet(
                     modifier = Modifier.align(Alignment.BottomCenter),
-                    title = "Save States",
+                    title = "Estados guardados",
                     subtitle = "Carga, guarda o borra estados sin perder progreso.",
                     onDismiss = { panelMode = OverlayPanelMode.NONE }
                 ) {
@@ -363,10 +363,10 @@ private fun OverlayBottomSheet(
 @Composable
 fun AboutPanelContent() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("\u00A9 NandaNes Inc 2026", color = Color.White, style = MaterialTheme.typography.titleSmall)
-        Text("Desarrollado por \u00A9 Shoropio Corporation 2026", color = Color(0xFFD7DCE4), style = MaterialTheme.typography.bodyMedium)
+        Text("NandaNes\u00A9 Inc 2026", color = Color.White, style = MaterialTheme.typography.titleSmall)
+        Text("Desarrollado por Shoropio\u00A9 Corporation 2026", color = Color(0xFFD7DCE4), style = MaterialTheme.typography.bodyMedium)
         Text(
-            "NandaNes es una interfaz Android para emulacion de Super Nintendo con overlay tactil, auto-save y runtime nativo.",
+            "NandaNes\u00A9 es una app para emulación de Super Nintendo.",
             color = Color(0xFFB3B7C0),
             style = MaterialTheme.typography.bodySmall
         )
@@ -399,28 +399,28 @@ private fun paletteForSkin(skin: ControlSkin): ControlSkinPalette = when (skin) 
         shoulder = Color(0xFF494D56),
         dpad = Color(0xFF35363B),
         center = Color(0xFF444650),
-        actionX = Color(0xFF2D74D7),
-        actionY = Color(0xFF2F9B37),
-        actionA = Color(0xFFD13B28),
-        actionB = Color(0xFFD29C18)
+        actionX = Color(0xFF61666F),
+        actionY = Color(0xFF61666F),
+        actionA = Color(0xFF61666F),
+        actionB = Color(0xFF61666F)
     )
     ControlSkin.NEON -> ControlSkinPalette(
-        shoulder = Color(0xFF4556A8),
-        dpad = Color(0xFF2C2F68),
-        center = Color(0xFF6B3DBD),
-        actionX = Color(0xFF00A6FF),
-        actionY = Color(0xFF1ED760),
-        actionA = Color(0xFFFF3B30),
-        actionB = Color(0xFFFFC300)
+        shoulder = Color(0xFF59606D),
+        dpad = Color(0xFF343943),
+        center = Color(0xFF4E5560),
+        actionX = Color(0xFF7A828F),
+        actionY = Color(0xFF7A828F),
+        actionA = Color(0xFF7A828F),
+        actionB = Color(0xFF7A828F)
     )
     ControlSkin.CARBON -> ControlSkinPalette(
         shoulder = Color(0xFF4C4C4C),
         dpad = Color(0xFF2D2D2D),
         center = Color(0xFF595959),
-        actionX = Color(0xFF6F7C8F),
-        actionY = Color(0xFF6B8266),
-        actionA = Color(0xFF8F6C6A),
-        actionB = Color(0xFFA68753)
+        actionX = Color(0xFF6A6F78),
+        actionY = Color(0xFF6A6F78),
+        actionA = Color(0xFF6A6F78),
+        actionB = Color(0xFF6A6F78)
     )
 }
 
@@ -432,7 +432,7 @@ private fun FloatingMenuButton(
 ) {
     FloatingIconButton(
         modifier = modifier,
-        label = if (active) "X" else "≡",
+        label = if (active) "X" else "\u2261",
         active = active,
         onClick = onClick
     )
@@ -654,20 +654,79 @@ private fun RetroDpad(
 ) {
     Box(modifier = Modifier.size(size * 2.44f)) {
         Box(modifier = Modifier.align(Alignment.TopCenter).offset(y = (-2).dp)) {
-            RetroPillButton("↑", SnesKey.UP, onPress, onRelease, size * 0.9f, size * 0.8f, palette.dpad, opacity)
+            DpadArrowButton("\u2191", SnesKey.UP, onPress, onRelease, size * 0.9f, size * 0.8f, opacity)
         }
         Box(modifier = Modifier.align(Alignment.CenterStart).offset(x = (-2).dp)) {
-            RetroPillButton("←", SnesKey.LEFT, onPress, onRelease, size * 0.9f, size * 0.8f, palette.dpad, opacity)
+            DpadArrowButton("\u2190", SnesKey.LEFT, onPress, onRelease, size * 0.9f, size * 0.8f, opacity)
         }
         Box(modifier = Modifier.align(Alignment.CenterEnd).offset(x = 2.dp)) {
-            RetroPillButton("→", SnesKey.RIGHT, onPress, onRelease, size * 0.9f, size * 0.8f, palette.dpad, opacity)
+            DpadArrowButton("\u2192", SnesKey.RIGHT, onPress, onRelease, size * 0.9f, size * 0.8f, opacity)
         }
         Box(modifier = Modifier.align(Alignment.BottomCenter).offset(y = 2.dp)) {
-            RetroPillButton("↓", SnesKey.DOWN, onPress, onRelease, size * 0.9f, size * 0.8f, palette.dpad, opacity)
+            DpadArrowButton("\u2193", SnesKey.DOWN, onPress, onRelease, size * 0.9f, size * 0.8f, opacity)
         }
     }
 }
 
+@Composable
+@OptIn(ExperimentalComposeUiApi::class)
+private fun DpadArrowButton(
+    label: String,
+    key: SnesKey,
+    onPress: (SnesKey) -> Unit,
+    onRelease: (SnesKey) -> Unit,
+    buttonWidth: Dp,
+    buttonHeight: Dp,
+    opacity: Float
+) {
+    var pressed by remember { mutableStateOf(false) }
+    val shape = when (label) {
+        "\u2191" -> RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 10.dp, bottomEnd = 10.dp)
+        "\u2193" -> RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp, bottomStart = 20.dp, bottomEnd = 20.dp)
+        "\u2190" -> RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 10.dp, bottomEnd = 10.dp)
+        "\u2192" -> RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp, topEnd = 20.dp, bottomEnd = 20.dp)
+        else -> RoundedCornerShape(18.dp)
+    }
+    Box(
+        modifier = Modifier
+            .size(buttonWidth, buttonHeight)
+            .clip(shape)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = if (pressed) 0.06f else 0.02f),
+                        Color.Transparent
+                    )
+                )
+            )
+            .border(2.dp, Color(0xFF8E95A3).copy(alpha = opacity * if (pressed) 1f else 0.8f), shape)
+            .pointerInteropFilter {
+                when (it.actionMasked) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                        pressed = true
+                        onPress(key)
+                        true
+                    }
+
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                        pressed = false
+                        onRelease(key)
+                        true
+                    }
+
+                    else -> false
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = Color(0xFFD7DCE6).copy(alpha = opacity),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Black
+        )
+    }
+}
 @Composable
 private fun RetroActionCluster(
     size: Dp,
@@ -711,12 +770,12 @@ private fun RetroRoundButton(
             .background(
                 Brush.radialGradient(
                     colors = listOf(
-                        accent.copy(alpha = opacity * if (pressed) 0.95f else 0.56f),
-                        Color(0xFF111215).copy(alpha = opacity)
+                        Color(0xFF23262D).copy(alpha = opacity * if (pressed) 0.88f else 0.72f),
+                        Color(0xFF131417).copy(alpha = opacity)
                     )
                 )
             )
-            .border(2.dp, accent.copy(alpha = opacity), CircleShape)
+            .border(2.dp, Color(0xFF6F7683).copy(alpha = opacity * 0.9f), CircleShape)
             .pointerInteropFilter {
                 when (it.actionMasked) {
                     MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
@@ -738,9 +797,9 @@ private fun RetroRoundButton(
     ) {
         Text(
             label,
-            color = Color.White.copy(alpha = 0.96f),
+            color = Color.White.copy(alpha = 0.82f),
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Black
         )
     }
 }
@@ -767,12 +826,12 @@ private fun RetroPillButton(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        fillColor.copy(alpha = opacity * if (pressed) 0.98f else 0.76f),
-                        Color(0xFF15161A).copy(alpha = opacity)
+                        Color(0xFF2C2F35).copy(alpha = opacity * if (pressed) 0.9f else 0.72f),
+                        Color(0xFF111216).copy(alpha = opacity)
                     )
                 )
             )
-            .border(2.dp, Color.White.copy(alpha = opacity * 0.16f), shape)
+            .border(2.dp, Color(0xFF6F7683).copy(alpha = opacity * 0.85f), shape)
             .pointerInteropFilter {
                 when (it.actionMasked) {
                     MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
@@ -794,9 +853,55 @@ private fun RetroPillButton(
     ) {
         Text(
             label,
-            color = Color.White.copy(alpha = 0.95f),
+            color = Color.White.copy(alpha = 0.82f),
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Black
+        )
+    }
+}
+
+@Composable
+@OptIn(ExperimentalComposeUiApi::class)
+private fun RetroSystemGlyphButton(
+    label: String,
+    key: SnesKey,
+    onPress: (SnesKey) -> Unit,
+    onRelease: (SnesKey) -> Unit,
+    buttonSize: Dp,
+    opacity: Float
+) {
+    var pressed by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(10.dp)
+    Box(
+        modifier = Modifier
+            .size(buttonSize, buttonSize * 0.72f)
+            .clip(shape)
+            .background(if (pressed) Color(0x16181B21) else Color.Transparent)
+            .border(2.dp, Color(0xFF8A909A).copy(alpha = opacity * if (pressed) 1f else 0.85f), shape)
+            .pointerInteropFilter {
+                when (it.actionMasked) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                        pressed = true
+                        onPress(key)
+                        true
+                    }
+
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                        pressed = false
+                        onRelease(key)
+                        true
+                    }
+
+                    else -> false
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = Color(0xFFD2D7DF).copy(alpha = opacity),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Black
         )
     }
 }

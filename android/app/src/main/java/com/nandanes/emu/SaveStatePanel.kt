@@ -81,11 +81,11 @@ fun SaveSlotsPanel(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Save States", color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text("Estados guardados", color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(
                     if (autoAt > 0) {
-                        val base = "Auto-save ${dateFmt.format(Date(autoAt))}"
-                        autoReason?.let { "$base · $it" } ?: base
+                        val base = "Auto-guardado ${dateFmt.format(Date(autoAt))}"
+                        autoReason?.let { "$base · ${humanizeAutoSaveReason(it)}" } ?: base
                     } else {
                         "Usa los slots sin tapar la partida"
                     },
@@ -95,9 +95,7 @@ fun SaveSlotsPanel(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
-            CompactActionButton(onClick = onClose, accent = Color(0x663A3A42)) {
-                Text("Cerrar", style = MaterialTheme.typography.labelSmall)
-            }
+            SquareActionButton(onClick = onClose, accent = Color(0x663A3A42), label = "✕")
             Spacer(modifier = Modifier.width(8.dp))
             Switch(
                 checked = autoResumeEnabled,
@@ -124,7 +122,7 @@ fun SaveSlotsPanel(
                     val autoText = when {
                         autoAt > 0 -> {
                             val base = dateFmt.format(Date(autoAt))
-                            base + (autoReason?.let { " ($it)" } ?: "")
+                            base + (autoReason?.let { " (${humanizeAutoSaveReason(it)})" } ?: "")
                         }
                         autoFileExists -> "Guardado"
                         else -> "Vacio"
@@ -134,8 +132,24 @@ fun SaveSlotsPanel(
                         title = "Auto",
                         subtitle = autoText,
                         bitmap = autoBmp,
-                        primary = { CompactActionButton(onClick = onLoadAutoSave, enabled = autoFileExists, modifier = Modifier.weight(1f)) { Text("Load", style = MaterialTheme.typography.labelSmall) } },
-                        secondary = { CompactActionButton(onClick = onDeleteAutoSave, enabled = autoFileExists, modifier = Modifier.weight(1f), accent = Color(0xFF4A2727)) { Text("Del", style = MaterialTheme.typography.labelSmall) } }
+                        primary = {
+                            SquareActionButton(
+                                onClick = onLoadAutoSave,
+                                enabled = autoFileExists,
+                                modifier = Modifier.weight(1f),
+                                accent = Color(0xFF2B3D5C),
+                                label = "↑"
+                            )
+                        },
+                        secondary = {
+                            SquareActionButton(
+                                onClick = onDeleteAutoSave,
+                                enabled = autoFileExists,
+                                modifier = Modifier.weight(1f),
+                                accent = Color(0xFF4A2727),
+                                label = "✕"
+                            )
+                        }
                     )
                 } else {
                     val slot = slotOrAuto
@@ -151,8 +165,22 @@ fun SaveSlotsPanel(
                         title = "Slot $slot",
                         subtitle = text,
                         bitmap = bmp,
-                        primary = { CompactActionButton(onClick = { onSave(slot) }, modifier = Modifier.weight(1f)) { Text("Save", style = MaterialTheme.typography.labelSmall) } },
-                        secondary = { CompactActionButton(onClick = { onLoad(slot) }, enabled = stateFile.exists(), modifier = Modifier.weight(1f), accent = Color(0xFF2B3D5C)) { Text("Load", style = MaterialTheme.typography.labelSmall) } }
+                        primary = {
+                            SquareActionButton(
+                                onClick = { onSave(slot) },
+                                modifier = Modifier.weight(1f),
+                                label = "↓"
+                            )
+                        },
+                        secondary = {
+                            SquareActionButton(
+                                onClick = { onLoad(slot) },
+                                enabled = stateFile.exists(),
+                                modifier = Modifier.weight(1f),
+                                accent = Color(0xFF2B3D5C),
+                                label = "↑"
+                            )
+                        }
                     )
                 }
             }
@@ -230,4 +258,36 @@ fun CompactActionButton(
         ),
         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
     ) { content() }
+}
+
+@Composable
+private fun SquareActionButton(
+    onClick: () -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    accent: Color = Color(0xFF5D4FA3)
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(48.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = accent,
+            contentColor = Color.White,
+            disabledContainerColor = accent.copy(alpha = 0.35f),
+            disabledContentColor = Color.White.copy(alpha = 0.55f)
+        ),
+        contentPadding = PaddingValues(0.dp)
+    ) {
+        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
+private fun humanizeAutoSaveReason(reason: String): String = when (reason) {
+    "returnHome" -> "volver al inicio"
+    "onPause" -> "pausa"
+    "onStop" -> "segundo plano"
+    else -> reason
 }

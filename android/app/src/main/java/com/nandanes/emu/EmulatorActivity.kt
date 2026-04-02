@@ -469,7 +469,7 @@ private fun RomPickerScreen(
             Text("NandaNes", style = MaterialTheme.typography.headlineMedium, color = Color.White)
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                "Emulador SNES para Android con controles tactiles, auto-save y personalizacion del overlay.",
+                "¿Qué pasa, chavales? ¿Todo bien? ¿Todo correcto? Y yo que me alegro.",
                 color = Color.LightGray
             )
             Spacer(modifier = Modifier.height(18.dp))
