@@ -1,0 +1,1 @@
+C:\Users\Shoropio\Desktop\NandaNes\android\app\src\main\cpp\CMakeLists.txt

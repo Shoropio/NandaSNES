@@ -1,0 +1,2 @@
+PS C:\Users\Shoropio\Desktop\NandaNes\android\app\build\outputs\apk\debug> adb shell run-as com.nandanes.emu cat files/debug/emu-debug.log > emu-debug.log
+PS C:\Users\Shoropio\Desktop\NandaNes\android\app\build\outputs\apk\debug> adb install -r app-debug.apk
