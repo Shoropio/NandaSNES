@@ -52,7 +52,6 @@ class NativeBridge {
     external fun getVideoFrameCount(): Long
     external fun renderLatestFrameToBitmap(bitmap: Bitmap): Boolean
     external fun consumeAudioSamples(maxSamples: Int): ShortArray
-    external fun consumeAudioSamples(buffer: ShortArray, maxSamples: Int): Int
     external fun getPendingAudioSamples(): Int
     external fun getAudioSampleRate(): Int
     external fun setDebugLoggingEnabled(enabled: Boolean)

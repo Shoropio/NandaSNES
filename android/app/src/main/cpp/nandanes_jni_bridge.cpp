@@ -956,44 +956,6 @@ Java_com_nandanes_emu_runtime_NativeBridge_consumeAudioSamples(
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_nandanes_emu_runtime_NativeBridge_consumeAudioSamples__3SI(
-    JNIEnv *env,
-    jobject /*thiz*/,
-    jshortArray buffer,
-    jint maxSamples) {
-    if (buffer == nullptr || maxSamples <= 0) return 0;
-
-    const jsize bufferLength = env->GetArrayLength(buffer);
-    if (bufferLength <= 0) return 0;
-
-    const size_t count = [&]() -> size_t {
-        std::lock_guard<std::mutex> lock(gAudioMutex);
-        return std::min({
-            static_cast<size_t>(maxSamples),
-            static_cast<size_t>(bufferLength),
-            gAudioQueue.size()
-        });
-    }();
-
-    if (count == 0) return 0;
-
-    jboolean isCopy = JNI_FALSE;
-    jshort *dst = env->GetShortArrayElements(buffer, &isCopy);
-    if (dst == nullptr) return 0;
-
-    {
-        std::lock_guard<std::mutex> lock(gAudioMutex);
-        for (size_t i = 0; i < count; ++i) {
-            dst[i] = gAudioQueue.front();
-            gAudioQueue.pop_front();
-        }
-    }
-
-    env->ReleaseShortArrayElements(buffer, dst, 0);
-    return static_cast<jint>(count);
-}
-
-extern "C" JNIEXPORT jint JNICALL
 Java_com_nandanes_emu_runtime_NativeBridge_getPendingAudioSamples(
     JNIEnv *env,
     jobject /*thiz*/) {
