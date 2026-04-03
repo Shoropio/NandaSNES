@@ -2,6 +2,8 @@ package com.nandanes.emu
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.nandanes.emu.data.save.SaveSlotMetadata
+import com.nandanes.emu.runtime.SaveStateManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +43,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,6 +53,7 @@ fun SaveSlotsPanel(
     romId: String,
     saveManager: SaveStateManager,
     refresh: Int,
+    isBusy: Boolean,
     onClose: () -> Unit,
     onSave: (Int) -> Unit,
     onLoad: (Int) -> Unit,
@@ -81,11 +86,16 @@ fun SaveSlotsPanel(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Estados guardados", color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Estados guardados",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
                 Text(
                     if (autoAt > 0) {
                         val base = "Auto-guardado ${dateFmt.format(Date(autoAt))}"
-                        autoReason?.let { "$base · ${humanizeAutoSaveReason(it)}" } ?: base
+                        autoReason?.let { "$base - ${humanizeAutoSaveReason(it)}" } ?: base
                     } else {
                         "Usa los slots sin tapar la partida"
                     },
@@ -95,10 +105,11 @@ fun SaveSlotsPanel(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
-            SquareActionButton(onClick = onClose, accent = Color(0x663A3A42), label = "✕")
+            SquareActionButton(onClick = onClose, accent = Color(0x663A3A42), label = "X")
             Spacer(modifier = Modifier.width(8.dp))
             Switch(
                 checked = autoResumeEnabled,
+                enabled = !isBusy,
                 onCheckedChange = { enabled ->
                     autoResumeEnabled = enabled
                     SaveSlotMetadata.setAutoResumeEnabled(ctx, romId, enabled)
@@ -107,9 +118,7 @@ fun SaveSlotsPanel(
         }
 
         val autoThumbFile = saveManager.autoThumbPath()
-        val autoBmp = remember(refresh, romId) {
-            if (autoThumbFile.exists()) BitmapFactory.decodeFile(autoThumbFile.absolutePath) else null
-        }
+        val autoBmp = rememberThumbnailBitmap(autoThumbFile.absolutePath, refresh, romId)
 
         LazyRow(
             modifier = Modifier
@@ -135,19 +144,19 @@ fun SaveSlotsPanel(
                         primary = {
                             SquareActionButton(
                                 onClick = onLoadAutoSave,
-                                enabled = autoFileExists,
+                                enabled = autoFileExists && !isBusy,
                                 modifier = Modifier.weight(1f),
                                 accent = Color(0xFF2B3D5C),
-                                label = "↑"
+                                label = "L"
                             )
                         },
                         secondary = {
                             SquareActionButton(
                                 onClick = onDeleteAutoSave,
-                                enabled = autoFileExists,
+                                enabled = autoFileExists && !isBusy,
                                 modifier = Modifier.weight(1f),
                                 accent = Color(0xFF4A2727),
-                                label = "✕"
+                                label = "X"
                             )
                         }
                     )
@@ -156,10 +165,12 @@ fun SaveSlotsPanel(
                     val thumbFile = saveManager.manualThumbPath(slot)
                     val stateFile = saveManager.manualSlotPath(slot)
                     val savedAt = SaveSlotMetadata.getSlotSavedAtMillis(ctx, romId, slot)
-                    val bmp = remember(refresh, slot, romId) {
-                        if (thumbFile.exists()) BitmapFactory.decodeFile(thumbFile.absolutePath) else null
+                    val bmp = rememberThumbnailBitmap(thumbFile.absolutePath, refresh, romId, slot)
+                    val text = if (stateFile.exists() && savedAt > 0) {
+                        dateFmt.format(Date(savedAt))
+                    } else {
+                        "Vacio"
                     }
-                    val text = if (stateFile.exists() && savedAt > 0) dateFmt.format(Date(savedAt)) else "Vacio"
 
                     SaveSlotCard(
                         title = "Slot $slot",
@@ -168,17 +179,18 @@ fun SaveSlotsPanel(
                         primary = {
                             SquareActionButton(
                                 onClick = { onSave(slot) },
+                                enabled = !isBusy,
                                 modifier = Modifier.weight(1f),
-                                label = "↓"
+                                label = "S"
                             )
                         },
                         secondary = {
                             SquareActionButton(
                                 onClick = { onLoad(slot) },
-                                enabled = stateFile.exists(),
+                                enabled = stateFile.exists() && !isBusy,
                                 modifier = Modifier.weight(1f),
                                 accent = Color(0xFF2B3D5C),
-                                label = "↑"
+                                label = "L"
                             )
                         }
                     )
@@ -186,6 +198,34 @@ fun SaveSlotsPanel(
             }
         }
     }
+}
+
+@Composable
+private fun rememberThumbnailBitmap(
+    path: String,
+    vararg keys: Any?
+): Bitmap? {
+    val bitmap = remember(*keys) {
+        val file = File(path)
+        if (!file.exists()) {
+            null
+        } else {
+            BitmapFactory.decodeFile(
+                file.absolutePath,
+                BitmapFactory.Options().apply {
+                    inPreferredConfig = Bitmap.Config.RGB_565
+                }
+            )
+        }
+    }
+
+    DisposableEffect(bitmap) {
+        onDispose {
+            bitmap?.recycle()
+        }
+    }
+
+    return bitmap
 }
 
 @Composable
@@ -206,7 +246,12 @@ private fun SaveSlotCard(
             Spacer(modifier = Modifier.height(4.dp))
             ThumbFrame(bitmap)
             Spacer(modifier = Modifier.height(4.dp))
-            Text(subtitle, color = Color.LightGray, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            Text(
+                subtitle,
+                color = Color.LightGray,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 primary()
                 secondary()

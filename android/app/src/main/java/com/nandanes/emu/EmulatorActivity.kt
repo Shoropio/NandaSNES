@@ -2,7 +2,7 @@
 
 import android.net.Uri
 import android.os.Bundle
-import android.provider.OpenableColumns
+import androidx.activity.viewModels
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
@@ -38,48 +39,50 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
+import com.nandanes.emu.data.rom.CompatibleRom
+import com.nandanes.emu.data.rom.RecentRom
+import com.nandanes.emu.data.rom.RomLibraryRepository
+import com.nandanes.emu.data.save.SaveSlotMetadata
+import com.nandanes.emu.data.settings.ControlOverlaySettings
+import com.nandanes.emu.data.settings.ControlOverlaySettingsStore
+import com.nandanes.emu.data.settings.DebugSettings
+import com.nandanes.emu.data.settings.DebugSettingsStore
+import com.nandanes.emu.data.settings.EmulatorDebug
+import com.nandanes.emu.domain.usecase.LoadRomUseCase
+import com.nandanes.emu.domain.usecase.LoadStateUseCase
+import com.nandanes.emu.domain.usecase.SaveStateUseCase
+import com.nandanes.emu.runtime.AudioPlayer
+import com.nandanes.emu.runtime.AutoSaveManager
+import com.nandanes.emu.runtime.EmulatorVideoSurface
+import com.nandanes.emu.runtime.NativeBridge
+import com.nandanes.emu.runtime.SaveStateManager
+import com.nandanes.emu.runtime.VibrationController
 import java.io.File
-import java.io.FileOutputStream
-import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-
-private data class CompatibleRom(
-    val label: String,
-    val path: String,
-    val lastModified: Long
-)
-
-private data class RomUiState(
-    val romLoaded: Boolean = false,
-    val romId: String = "",
-    val romLabel: String = "",
-    val romPath: String = "",
-    val importError: String? = null,
-    val slotsRefresh: Int = 0,
-    val recentRoms: List<RecentRom> = emptyList(),
-    val compatibleRoms: List<CompatibleRom> = emptyList()
-)
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class EmulatorActivity : ComponentActivity() {
+    private val viewModel: EmulatorViewModel by viewModels()
     private val bridge = NativeBridge()
     private lateinit var vibration: VibrationController
     private lateinit var saveManager: SaveStateManager
     private lateinit var autoSaveManager: AutoSaveManager
-    private lateinit var recentRomStore: RecentRomStore
     private lateinit var overlaySettingsStore: ControlOverlaySettingsStore
     private lateinit var debugSettingsStore: DebugSettingsStore
     private lateinit var audioPlayer: AudioPlayer
-    private val uiState = mutableStateOf(RomUiState())
+    private lateinit var loadRomUseCase: LoadRomUseCase
+    private lateinit var saveStateUseCase: SaveStateUseCase
+    private lateinit var loadStateUseCase: LoadStateUseCase
     private val overlaySettings = mutableStateOf(ControlOverlaySettings())
     private val debugSettings = mutableStateOf(DebugSettings())
     private val debugLogText = mutableStateOf("Sin eventos todavia.")
     private val nativeDebugLogText = mutableStateOf("Sin eventos nativos todavia.")
     private val nativeSnapshotText = mutableStateOf("Abre una ROM para capturar snapshot nativo.")
-    private val ioExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
     private val pickRomLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -97,7 +100,9 @@ class EmulatorActivity : ComponentActivity() {
         vibration = VibrationController(this)
         saveManager = SaveStateManager(this)
         autoSaveManager = AutoSaveManager(this, saveManager, bridge)
-        recentRomStore = RecentRomStore(this)
+        loadRomUseCase = LoadRomUseCase(bridge, saveManager)
+        saveStateUseCase = SaveStateUseCase(bridge, saveManager)
+        loadStateUseCase = LoadStateUseCase(bridge, saveManager)
         overlaySettingsStore = ControlOverlaySettingsStore(this)
         debugSettingsStore = DebugSettingsStore(this)
         overlaySettings.value = overlaySettingsStore.load()
@@ -108,7 +113,6 @@ class EmulatorActivity : ComponentActivity() {
         EmulatorDebug.log("APP", "onCreate")
         bridge.initializeInputMapping()
         refreshDebugLog()
-        refreshRomLists()
 
         val romPathExtra = intent?.getStringExtra("romPath")
         if (!romPathExtra.isNullOrBlank()) {
@@ -116,7 +120,7 @@ class EmulatorActivity : ComponentActivity() {
         }
 
         setContent {
-            val state by uiState
+            val state by viewModel.uiState.collectAsState()
             val controlSettings by overlaySettings
             val debugMode by debugSettings
             val debugLog by debugLogText
@@ -178,38 +182,14 @@ class EmulatorActivity : ComponentActivity() {
                                         romId = state.romId,
                                         saveManager = saveManager,
                                         refresh = state.slotsRefresh,
+                                        isBusy = state.isProcessingSaveState,
                                         onClose = closeSavePanel,
-                                        onSave = { slot ->
-                                            saveManager.setActiveRomId(state.romId)
-                                            val saved = saveManager.saveStateAtomically(
-                                                bridge,
-                                                saveManager.manualSlotPath(slot)
-                                            )
-                                            if (saved) {
-                                                saveManager.writeCurrentFrameThumbnail(
-                                                    bridge,
-                                                    saveManager.manualThumbPath(slot)
-                                                )
-                                                SaveSlotMetadata.setSlotSavedAtMillis(
-                                                    this@EmulatorActivity,
-                                                    state.romId,
-                                                    slot,
-                                                    System.currentTimeMillis()
-                                                )
-                                                bumpSlotsRefresh()
-                                            }
-                                        },
-                                        onLoad = { slot ->
-                                            saveManager.setActiveRomId(state.romId)
-                                            bridge.loadState(saveManager.manualSlotPath(slot).absolutePath)
-                                        },
-                                        onLoadAutoSave = {
-                                            saveManager.setActiveRomId(state.romId)
-                                            bridge.loadState(saveManager.autoSlotPath().absolutePath)
-                                        },
+                                        onSave = { slot -> saveManualSlot(state.romId, slot) },
+                                        onLoad = { slot -> loadManualSlot(state.romId, slot) },
+                                        onLoadAutoSave = { loadAutoSave(state.romId) },
                                         onDeleteAutoSave = {
                                             autoSaveManager.deleteAutoSave(state.romId)
-                                            bumpSlotsRefresh()
+                                            viewModel.bumpSlotsRefresh()
                                         }
                                     )
                                 }
@@ -233,20 +213,22 @@ class EmulatorActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
-        EmulatorDebug.log("APP", "onPause romLoaded=${uiState.value.romLoaded}")
+        val currentState = viewModel.uiState.value
+        EmulatorDebug.log("APP", "onPause romLoaded=${currentState.romLoaded}")
         audioPlayer.stop()
-        if (uiState.value.romLoaded && autoSaveManager.tryAutoSave("onPause", uiState.value.romId)) {
-            bumpSlotsRefresh()
+        if (currentState.romLoaded && autoSaveManager.tryAutoSave("onPause", currentState.romId)) {
+            viewModel.bumpSlotsRefresh()
         }
         refreshDebugLog()
     }
 
     override fun onStop() {
         super.onStop()
-        EmulatorDebug.log("APP", "onStop romLoaded=${uiState.value.romLoaded}")
+        val currentState = viewModel.uiState.value
+        EmulatorDebug.log("APP", "onStop romLoaded=${currentState.romLoaded}")
         audioPlayer.stop()
-        if (uiState.value.romLoaded && autoSaveManager.tryAutoSave("onStop", uiState.value.romId)) {
-            bumpSlotsRefresh()
+        if (currentState.romLoaded && autoSaveManager.tryAutoSave("onStop", currentState.romId)) {
+            viewModel.bumpSlotsRefresh()
         }
         bridge.stopEmulation()
         refreshDebugLog()
@@ -258,56 +240,17 @@ class EmulatorActivity : ComponentActivity() {
         audioPlayer.release()
         bridge.stopEmulation()
         bridge.unloadRom()
-        ioExecutor.shutdownNow()
-    }
-
-    private fun refreshRomLists() {
-        recentRomStore.pruneMissingFiles()
-        uiState.value = uiState.value.copy(
-            recentRoms = recentRomStore.list(),
-            compatibleRoms = detectCompatibleRoms()
-        )
-    }
-
-    private fun bumpSlotsRefresh() {
-        val state = uiState.value
-        uiState.value = state.copy(slotsRefresh = state.slotsRefresh + 1)
     }
 
     private fun importRomFromUri(uri: Uri) {
         EmulatorDebug.log("ROM", "Import requested uri=$uri")
-        ioExecutor.execute {
-            try {
-                val label = queryDisplayName(uri) ?: "rom.sfc"
-                if (!isSupportedRomName(label)) {
-                    EmulatorDebug.log("ROM", "Unsupported import label=$label")
-                    runOnUiThread {
-                        uiState.value = uiState.value.copy(importError = "Formato no soportado. Usa .sfc, .smc o .fig")
-                    }
-                    return@execute
-                }
-
-                val romId = romIdFromUri(uri)
-                val extension = label.substringAfterLast('.', "sfc")
-                val destDir = File(filesDir, "rom_imports").also { it.mkdirs() }
-                val dest = File(destDir, "$romId.$extension")
-                EmulatorDebug.log("ROM", "Copy import label=$label dest=${dest.absolutePath}")
-
-                contentResolver.openInputStream(uri)?.use { input ->
-                    FileOutputStream(dest).use { output -> input.copyTo(output) }
-                } ?: run {
-                    runOnUiThread {
-                        uiState.value = uiState.value.copy(importError = "No se pudo abrir el archivo")
-                    }
-                    return@execute
-                }
-
-                runOnUiThread { loadRomFile(dest, label) }
-            } catch (e: Exception) {
-                EmulatorDebug.logAlways("ROM", "Import error ${e.message ?: e.javaClass.simpleName}")
-                runOnUiThread {
-                    uiState.value = uiState.value.copy(importError = e.message ?: "Error al importar")
-                }
+        viewModel.importRom(contentResolver, uri) { importedRom ->
+            lifecycleScope.launch {
+                EmulatorDebug.log(
+                    "ROM",
+                    "Copy import label=${importedRom.displayLabel} dest=${importedRom.file.absolutePath}"
+                )
+                loadRomFile(importedRom.file, importedRom.displayLabel)
             }
         }
     }
@@ -315,52 +258,33 @@ class EmulatorActivity : ComponentActivity() {
     private fun loadRomFile(file: File, displayLabel: String) {
         EmulatorDebug.log("ROM", "Load request file=${file.absolutePath} label=$displayLabel")
         if (!file.exists()) {
-            uiState.value = uiState.value.copy(importError = "La ROM no existe")
-            refreshRomLists()
+            viewModel.updateImportError("La ROM no existe")
+            viewModel.refreshRomLists()
             return
         }
-        if (!isSupportedRomName(file.name)) {
-            uiState.value = uiState.value.copy(importError = "Formato no soportado para la ROM")
+        if (!RomLibraryRepository.isSupportedRomName(file.name)) {
+            viewModel.updateImportError("Formato no soportado para la ROM")
             return
         }
 
-        val romId = romIdFromPath(file)
-        saveManager.setActiveRomId(romId)
+        val romId = RomLibraryRepository.romIdFromPath(file)
         audioPlayer.resetForNextRom()
 
-        val loaded = bridge.loadRom(file.absolutePath)
+        val loadResult = loadRomUseCase(file)
+        val loaded = loadResult.success
         EmulatorDebug.log("ROM", "loadRom result=$loaded snapshot=${bridge.getDebugSnapshot()}")
         if (!loaded) {
-            uiState.value = uiState.value.copy(importError = "No se pudo cargar la ROM")
+            viewModel.updateImportError("No se pudo cargar la ROM")
             refreshDebugLog()
             return
         }
 
+        val resolvedRomId = loadResult.romId ?: romId
         bridge.startEmulation()
         audioPlayer.start()
-        tryLoadLastAutoSaveOnRomStart(romId)
-        recentRomStore.record(romId, displayLabel, file.absolutePath)
-        refreshRomLists()
-        uiState.value = RomUiState(
-            romLoaded = true,
-            romId = romId,
-            romLabel = displayLabel,
-            romPath = file.absolutePath,
-            importError = null,
-            recentRoms = recentRomStore.list(),
-            compatibleRoms = detectCompatibleRoms()
-        )
+        tryLoadLastAutoSaveOnRomStart(resolvedRomId)
+        viewModel.onRomLoaded(resolvedRomId, displayLabel, file.absolutePath)
         refreshDebugLog()
-    }
-
-    private fun queryDisplayName(uri: Uri): String? {
-        val cursor = contentResolver.query(uri, null, null, null, null) ?: return null
-        cursor.use {
-            if (!it.moveToFirst()) return null
-            val idx = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (idx < 0) return null
-            return it.getString(idx)
-        }
     }
 
     private fun tryLoadLastAutoSaveOnRomStart(romId: String) {
@@ -411,7 +335,7 @@ class EmulatorActivity : ComponentActivity() {
     }
 
     private fun returnToHomeScreen() {
-        val state = uiState.value
+        val state = viewModel.uiState.value
         EmulatorDebug.log("APP", "Return to home requested romLoaded=${state.romLoaded}")
         audioPlayer.stop()
         if (state.romLoaded) {
@@ -419,52 +343,61 @@ class EmulatorActivity : ComponentActivity() {
         }
         bridge.stopEmulation()
         bridge.unloadRom()
-        refreshRomLists()
-        uiState.value = RomUiState(
-            romLoaded = false,
-            recentRoms = recentRomStore.list(),
-            compatibleRoms = detectCompatibleRoms()
-        )
+        viewModel.refreshRomLists()
+        viewModel.onRomClosed()
         refreshDebugLog()
     }
 
-    private fun detectCompatibleRoms(): List<CompatibleRom> {
-        val knownLabels = buildMap<String, String> {
-            recentRomStore.list().forEach { put(it.path, it.label) }
-        }
-        val importedDir = File(filesDir, "rom_imports")
-        if (!importedDir.exists()) return emptyList()
-
-        return importedDir.listFiles()
-            .orEmpty()
-            .asSequence()
-            .filter { it.isFile && isSupportedRomName(it.name) }
-            .map { file ->
-                CompatibleRom(
-                    label = knownLabels[file.absolutePath] ?: file.nameWithoutExtension,
-                    path = file.absolutePath,
-                    lastModified = file.lastModified()
-                )
+    private fun saveManualSlot(romId: String, slot: Int) {
+        lifecycleScope.launch {
+            viewModel.setSaveStateProcessing(true)
+            val saved = withContext(Dispatchers.IO) {
+                val saveSucceeded = saveStateUseCase(romId, slot)
+                if (saveSucceeded) {
+                    saveStateUseCase.writeThumbnail(romId, slot)
+                    SaveSlotMetadata.setSlotSavedAtMillis(
+                        this@EmulatorActivity,
+                        romId,
+                        slot,
+                        System.currentTimeMillis()
+                    )
+                }
+                saveSucceeded
             }
-            .sortedByDescending { it.lastModified }
-            .toList()
+            viewModel.setSaveStateProcessing(false)
+            if (saved) {
+                viewModel.bumpSlotsRefresh()
+            } else {
+                viewModel.updateImportError("No se pudo guardar el estado")
+            }
+        }
     }
-}
 
-private fun isSupportedRomName(name: String): Boolean {
-    val lower = name.lowercase(Locale.US)
-    return lower.endsWith(".sfc") || lower.endsWith(".smc") || lower.endsWith(".fig")
-}
+    private fun loadManualSlot(romId: String, slot: Int) {
+        lifecycleScope.launch {
+            viewModel.setSaveStateProcessing(true)
+            val loaded = withContext(Dispatchers.IO) {
+                loadStateUseCase.manualSlot(romId, slot)
+            }
+            viewModel.setSaveStateProcessing(false)
+            if (!loaded) {
+                viewModel.updateImportError("No se pudo cargar el estado")
+            }
+        }
+    }
 
-private fun romIdFromUri(uri: Uri): String {
-    val digest = MessageDigest.getInstance("MD5").digest(uri.toString().toByteArray(Charsets.UTF_8))
-    return digest.joinToString("") { "%02x".format(it) }
-}
-
-private fun romIdFromPath(file: File): String {
-    val raw = "${file.absolutePath}_${file.length()}_${file.lastModified()}"
-    val digest = MessageDigest.getInstance("MD5").digest(raw.toByteArray(Charsets.UTF_8))
-    return digest.joinToString("") { "%02x".format(it) }
+    private fun loadAutoSave(romId: String) {
+        lifecycleScope.launch {
+            viewModel.setSaveStateProcessing(true)
+            val loaded = withContext(Dispatchers.IO) {
+                loadStateUseCase.autoSave(romId)
+            }
+            viewModel.setSaveStateProcessing(false)
+            if (!loaded) {
+                viewModel.updateImportError("No se pudo cargar el auto-guardado")
+            }
+        }
+    }
 }
 
 @Composable

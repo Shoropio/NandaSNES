@@ -25,8 +25,8 @@
 18
 19    <application
 19-->C:\Users\Shoropio\Desktop\NandaNes\android\app\src\main\AndroidManifest.xml:5:5-20:19
-20        android:allowBackup="true"
-20-->C:\Users\Shoropio\Desktop\NandaNes\android\app\src\main\AndroidManifest.xml:6:9-35
+20        android:allowBackup="false"
+20-->C:\Users\Shoropio\Desktop\NandaNes\android\app\src\main\AndroidManifest.xml:6:9-36
 21        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
 21-->[androidx.core:core:1.13.1] C:\Users\Shoropio\.gradle\caches\8.9\transforms\3f4414e7258e46b34c51e68305e2ec6f\transformed\core-1.13.1\AndroidManifest.xml:28:18-86
 22        android:debuggable="true"
@@ -80,11 +80,11 @@
 48                android:value="androidx.startup" />
 48-->[androidx.emoji2:emoji2:1.3.0] C:\Users\Shoropio\.gradle\caches\8.9\transforms\e9a4de5f87829d8e56de87ff35dfed60\transformed\emoji2-1.3.0\AndroidManifest.xml:31:17-49
 49            <meta-data
-49-->[androidx.lifecycle:lifecycle-process:2.8.3] C:\Users\Shoropio\.gradle\caches\8.9\transforms\527ac84306fe6607d1ab2186d5efcc29\transformed\lifecycle-process-2.8.3\AndroidManifest.xml:29:13-31:52
+49-->[androidx.lifecycle:lifecycle-process:2.8.7] C:\Users\Shoropio\.gradle\caches\8.9\transforms\ef3f1b8cf943e0590111f6b7a018d36f\transformed\lifecycle-process-2.8.7\AndroidManifest.xml:29:13-31:52
 50                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
-50-->[androidx.lifecycle:lifecycle-process:2.8.3] C:\Users\Shoropio\.gradle\caches\8.9\transforms\527ac84306fe6607d1ab2186d5efcc29\transformed\lifecycle-process-2.8.3\AndroidManifest.xml:30:17-78
+50-->[androidx.lifecycle:lifecycle-process:2.8.7] C:\Users\Shoropio\.gradle\caches\8.9\transforms\ef3f1b8cf943e0590111f6b7a018d36f\transformed\lifecycle-process-2.8.7\AndroidManifest.xml:30:17-78
 51                android:value="androidx.startup" />
-51-->[androidx.lifecycle:lifecycle-process:2.8.3] C:\Users\Shoropio\.gradle\caches\8.9\transforms\527ac84306fe6607d1ab2186d5efcc29\transformed\lifecycle-process-2.8.3\AndroidManifest.xml:31:17-49
+51-->[androidx.lifecycle:lifecycle-process:2.8.7] C:\Users\Shoropio\.gradle\caches\8.9\transforms\ef3f1b8cf943e0590111f6b7a018d36f\transformed\lifecycle-process-2.8.7\AndroidManifest.xml:31:17-49
 52            <meta-data
 52-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Shoropio\.gradle\caches\8.9\transforms\4d07dd122260385b5a0f7c79a656e780\transformed\profileinstaller-1.3.1\AndroidManifest.xml:29:13-31:52
 53                android:name="androidx.profileinstaller.ProfileInstallerInitializer"

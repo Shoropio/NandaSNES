@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.nandanes.emu.app-mergeDebugResources-43:/values-da/values-da.xml",
+            "outputFile": "com.nandanes.emu.app-mergeDebugResources-46:/values-da/values-da.xml",
             "map": [
                 {
                     "source": "C:\\Users\\Shoropio\\.gradle\\caches\\8.9\\transforms\\5803f6db40720b4b04ac96006abfb2e1\\transformed\\ui-release\\res\\values-da\\values-da.xml",

@@ -1,27 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.nandanes.emu.app-mergeDebugResources-43:/values/values.xml",
+            "outputFile": "com.nandanes.emu.app-mergeDebugResources-46:/values/values.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Shoropio\\.gradle\\caches\\8.9\\transforms\\4cc86d7436a96aaad2d5758b7220c83f\\transformed\\lifecycle-runtime-release\\res\\values\\values.xml",
-                    "from": {
-                        "startLines": "2",
-                        "startColumns": "4",
-                        "startOffsets": "55",
-                        "endColumns": "42",
-                        "endOffsets": "93"
-                    },
-                    "to": {
-                        "startLines": "93",
-                        "startColumns": "4",
-                        "startOffsets": "5673",
-                        "endColumns": "42",
-                        "endOffsets": "5711"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\Shoropio\\.gradle\\caches\\8.9\\transforms\\02696bf46992f793bd5ff2bac40ae20e\\transformed\\lifecycle-viewmodel-release\\res\\values\\values.xml",
+                    "source": "C:\\Users\\Shoropio\\.gradle\\caches\\8.9\\transforms\\a483df286ac277a2bd89b205e989905f\\transformed\\lifecycle-viewmodel-release\\res\\values\\values.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",
@@ -124,6 +107,23 @@
                         "startOffsets": "12251,12307",
                         "endColumns": "55,54",
                         "endOffsets": "12302,12357"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\Shoropio\\.gradle\\caches\\8.9\\transforms\\e64478da7d914ea0e0500601debfb46a\\transformed\\lifecycle-runtime-release\\res\\values\\values.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "42",
+                        "endOffsets": "93"
+                    },
+                    "to": {
+                        "startLines": "93",
+                        "startColumns": "4",
+                        "startOffsets": "5673",
+                        "endColumns": "42",
+                        "endOffsets": "5711"
                     }
                 },
                 {

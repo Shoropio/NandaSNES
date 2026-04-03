@@ -293,56 +293,59 @@ bool RetroEnvironmentCb(unsigned cmd, void *data) {
 void RetroVideoCb(const void *data, unsigned width, unsigned height, size_t pitch) {
     if (data == nullptr || width == 0 || height == 0) return;
     const uint64_t frameIndex = ++gVideoFrameCount;
-
-    const uint8_t *srcBytes = static_cast<const uint8_t *>(data);
-    uint32_t checksum = 2166136261u;
+    uint32_t checksum = 0;
     uint32_t firstPixel = 0;
     uint32_t centerPixel = 0;
 
-    for (unsigned y = 0; y < height; y++) {
-        const uint8_t *srcLine = srcBytes + y * pitch;
-        for (unsigned x = 0; x < width; x++) {
-            uint8_t r8 = 0;
-            uint8_t g8 = 0;
-            uint8_t b8 = 0;
-            switch (gPixelFormat) {
-                case RETRO_PIXEL_FORMAT_XRGB8888: {
-                    const uint32_t pixel = reinterpret_cast<const uint32_t *>(srcLine)[x];
-                    r8 = static_cast<uint8_t>((pixel >> 16) & 0xFF);
-                    g8 = static_cast<uint8_t>((pixel >> 8) & 0xFF);
-                    b8 = static_cast<uint8_t>(pixel & 0xFF);
-                    break;
+    if (gDebugLoggingEnabled.load()) {
+        const uint8_t *srcBytes = static_cast<const uint8_t *>(data);
+        checksum = 2166136261u;
+
+        for (unsigned y = 0; y < height; y++) {
+            const uint8_t *srcLine = srcBytes + y * pitch;
+            for (unsigned x = 0; x < width; x++) {
+                uint8_t r8 = 0;
+                uint8_t g8 = 0;
+                uint8_t b8 = 0;
+                switch (gPixelFormat) {
+                    case RETRO_PIXEL_FORMAT_XRGB8888: {
+                        const uint32_t pixel = reinterpret_cast<const uint32_t *>(srcLine)[x];
+                        r8 = static_cast<uint8_t>((pixel >> 16) & 0xFF);
+                        g8 = static_cast<uint8_t>((pixel >> 8) & 0xFF);
+                        b8 = static_cast<uint8_t>(pixel & 0xFF);
+                        break;
+                    }
+                    case RETRO_PIXEL_FORMAT_0RGB1555: {
+                        const uint16_t pixel = reinterpret_cast<const uint16_t *>(srcLine)[x];
+                        const uint8_t r5 = (pixel >> 10) & 0x1F;
+                        const uint8_t g5 = (pixel >> 5) & 0x1F;
+                        const uint8_t b5 = pixel & 0x1F;
+                        r8 = static_cast<uint8_t>((r5 * 255) / 31);
+                        g8 = static_cast<uint8_t>((g5 * 255) / 31);
+                        b8 = static_cast<uint8_t>((b5 * 255) / 31);
+                        break;
+                    }
+                    case RETRO_PIXEL_FORMAT_RGB565:
+                    default: {
+                        const uint16_t pixel = reinterpret_cast<const uint16_t *>(srcLine)[x];
+                        const uint8_t r5 = (pixel >> 11) & 0x1F;
+                        const uint8_t g6 = (pixel >> 5) & 0x3F;
+                        const uint8_t b5 = pixel & 0x1F;
+                        r8 = static_cast<uint8_t>((r5 * 255) / 31);
+                        g8 = static_cast<uint8_t>((g6 * 255) / 63);
+                        b8 = static_cast<uint8_t>((b5 * 255) / 31);
+                        break;
+                    }
                 }
-                case RETRO_PIXEL_FORMAT_0RGB1555: {
-                    const uint16_t pixel = reinterpret_cast<const uint16_t *>(srcLine)[x];
-                    const uint8_t r5 = (pixel >> 10) & 0x1F;
-                    const uint8_t g5 = (pixel >> 5) & 0x1F;
-                    const uint8_t b5 = pixel & 0x1F;
-                    r8 = static_cast<uint8_t>((r5 * 255) / 31);
-                    g8 = static_cast<uint8_t>((g5 * 255) / 31);
-                    b8 = static_cast<uint8_t>((b5 * 255) / 31);
-                    break;
+                const uint32_t argb = (0xFFu << 24) | (r8 << 16) | (g8 << 8) | b8;
+                checksum ^= argb;
+                checksum *= 16777619u;
+                if (x == 0 && y == 0) {
+                    firstPixel = argb;
                 }
-                case RETRO_PIXEL_FORMAT_RGB565:
-                default: {
-                    const uint16_t pixel = reinterpret_cast<const uint16_t *>(srcLine)[x];
-                    const uint8_t r5 = (pixel >> 11) & 0x1F;
-                    const uint8_t g6 = (pixel >> 5) & 0x3F;
-                    const uint8_t b5 = pixel & 0x1F;
-                    r8 = static_cast<uint8_t>((r5 * 255) / 31);
-                    g8 = static_cast<uint8_t>((g6 * 255) / 63);
-                    b8 = static_cast<uint8_t>((b5 * 255) / 31);
-                    break;
+                if (x == width / 2u && y == height / 2u) {
+                    centerPixel = argb;
                 }
-            }
-            const uint32_t argb = (0xFFu << 24) | (r8 << 16) | (g8 << 8) | b8;
-            checksum ^= argb;
-            checksum *= 16777619u;
-            if (x == 0 && y == 0) {
-                firstPixel = argb;
-            }
-            if (x == width / 2u && y == height / 2u) {
-                centerPixel = argb;
             }
         }
     }
@@ -942,6 +945,44 @@ Java_com_nandanes_emu_NativeBridge_consumeAudioSamples(
         env->SetShortArrayRegion(result, 0, static_cast<jsize>(out.size()), out.data());
     }
     return result;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_nandanes_emu_NativeBridge_consumeAudioSamples__3SI(
+    JNIEnv *env,
+    jobject /*thiz*/,
+    jshortArray buffer,
+    jint maxSamples) {
+    if (buffer == nullptr || maxSamples <= 0) return 0;
+
+    const jsize bufferLength = env->GetArrayLength(buffer);
+    if (bufferLength <= 0) return 0;
+
+    const size_t count = [&]() -> size_t {
+        std::lock_guard<std::mutex> lock(gAudioMutex);
+        return std::min({
+            static_cast<size_t>(maxSamples),
+            static_cast<size_t>(bufferLength),
+            gAudioQueue.size()
+        });
+    }();
+
+    if (count == 0) return 0;
+
+    jboolean isCopy = JNI_FALSE;
+    jshort *dst = env->GetShortArrayElements(buffer, &isCopy);
+    if (dst == nullptr) return 0;
+
+    {
+        std::lock_guard<std::mutex> lock(gAudioMutex);
+        for (size_t i = 0; i < count; ++i) {
+            dst[i] = gAudioQueue.front();
+            gAudioQueue.pop_front();
+        }
+    }
+
+    env->ReleaseShortArrayElements(buffer, dst, 0);
+    return static_cast<jint>(count);
 }
 
 extern "C" JNIEXPORT jint JNICALL
