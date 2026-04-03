@@ -1,4 +1,4 @@
-## NandaNes Android
+## NandaSNES Android
 
 Aplicacion Android del proyecto, construida con Kotlin, Jetpack Compose, NDK y un bridge JNI hacia el core `snes9x`.
 

@@ -432,7 +432,7 @@ private fun RomPickerScreen(
                 Text("NN", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
             }
             Spacer(modifier = Modifier.height(14.dp))
-            Text("NandaNes", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+            Text("NandaSNES", style = MaterialTheme.typography.headlineMedium, color = Color.White)
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 "Emulador de SNES para Android con overlay tactil y guardado rapido.",
@@ -541,4 +541,3 @@ private fun RomPickerScreen(
         }
     }
 }
-

@@ -1,7 +1,7 @@
 #include <jni.h>
 #include <string>
 
-// Headers reales dependen de cómo esté embebido Snes9x en NandaNes.
+// Headers reales dependen de como este embebido Snes9x en NandaSNES.
 extern "C" {
     bool S9xFreezeGame(const char* filename);
     bool S9xUnfreezeGame(const char* filename);

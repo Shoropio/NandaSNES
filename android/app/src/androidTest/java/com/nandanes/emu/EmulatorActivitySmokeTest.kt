@@ -22,7 +22,7 @@ class EmulatorActivitySmokeTest {
 
     @Test
     fun launch_showsRomPickerPrimaryActions() {
-        composeRule.onNodeWithText("NandaNes").assertIsDisplayed()
+        composeRule.onNodeWithText("NandaSNES").assertIsDisplayed()
         composeRule.onNodeWithText("Elegir ROM").assertIsDisplayed()
         composeRule.onNodeWithText("Acerca de").assertIsDisplayed()
     }

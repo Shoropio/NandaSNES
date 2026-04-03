@@ -1,6 +1,6 @@
 # Release Signing
 
-`NandaNes` now supports Android release signing without storing secrets in Git.
+`NandaSNES` now supports Android release signing without storing secrets in Git.
 
 ## Option 1: local `keystore.properties`
 

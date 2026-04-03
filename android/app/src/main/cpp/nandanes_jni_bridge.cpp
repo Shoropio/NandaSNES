@@ -76,7 +76,7 @@ std::mutex gAudioMutex;
 std::deque<int16_t> gAudioQueue;
 int gAudioSampleRate = 32040;
 constexpr size_t kMaxAudioSamples = 32040 * 4;
-constexpr const char *kLogTag = "NandaNesNative";
+constexpr const char *kLogTag = "NandaSnesNative";
 constexpr int64_t kDefaultFrameDurationNs = 16666667LL;
 
 char gSystemDir[1024] = ".";

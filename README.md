@@ -1,4 +1,4 @@
-# NandaNes
+# NandaSNES
 
 Android emulator app backed by the `snes9x` core through JNI. The project uses Jetpack Compose for the UI, Kotlin for the Android app layer, and C++ for the native runtime bridge.
 
@@ -9,7 +9,7 @@ Android emulator app backed by the `snes9x` core through JNI. The project uses J
 - Refactored project structure with `presentation`, `data`, `domain`, and `runtime` responsibilities
 - `snes9x` integrated as a Git submodule under `third_party/snes9x`
 
-Important: despite the repository name, the current emulator core is SNES, not NES.
+Important: the current GitHub repository URL may still use the legacy `NandaNes` name until the remote is renamed, but the product branding is now `NandaSNES`.
 
 ## Repository layout
 

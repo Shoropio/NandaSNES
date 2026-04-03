@@ -14,6 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "NandaNes"
+rootProject.name = "NandaSNES"
 include(":app")
 

@@ -1,4 +1,4 @@
-# NandaNes: UX/UI avanzada + Save System (Android-first)
+# NandaSNES: UX/UI avanzada + Save System (Android-first)
 
 ## 1) Overlay táctil SNES + hápticos
 
@@ -66,8 +66,8 @@ Si requieres export/import visible al usuario:
 
 ### Windows
 - Ruta por usuario:
-  - `%LOCALAPPDATA%/NandaNes/saves/*.frz`
-  - `%LOCALAPPDATA%/NandaNes/thumbs/*.png`
+  - `%LOCALAPPDATA%/NandaSNES/saves/*.frz`
+  - `%LOCALAPPDATA%/NandaSNES/thumbs/*.png`
 - Crear carpetas al iniciar y validar escritura.
 
 ## 5) Auto-save robusto

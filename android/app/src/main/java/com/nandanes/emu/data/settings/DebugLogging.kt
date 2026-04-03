@@ -41,7 +41,7 @@ class DebugSettingsStore(context: Context) {
 }
 
 object EmulatorDebug {
-    private const val TAG = "NandaNesDebug"
+private const val TAG = "NandaSnesDebug"
     private var logFile: File? = null
     @Volatile private var enabled: Boolean = false
     private val timestampFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)

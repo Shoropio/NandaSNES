@@ -367,10 +367,10 @@ private fun OverlayBottomSheet(
 @Composable
 fun AboutPanelContent() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("NandaNes Inc 2026", color = Color.White, style = MaterialTheme.typography.titleSmall)
+        Text("NandaSNES Inc 2026", color = Color.White, style = MaterialTheme.typography.titleSmall)
         Text("Desarrollado por Shoropio Corporation 2026", color = Color(0xFFD7DCE4), style = MaterialTheme.typography.bodyMedium)
         Text(
-            "NandaNes es una app para emulacion de Super Nintendo.",
+            "NandaSNES es una app para emulacion de Super Nintendo.",
             color = Color(0xFFB3B7C0),
             style = MaterialTheme.typography.bodySmall
         )
