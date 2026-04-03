@@ -458,7 +458,7 @@ private fun RomPickerScreen(
                 )
             }
 
-            items(recentRoms, key = { it.path }) { recent ->
+            items(recentRoms, key = { "recent:${recentKey(it)}" }) { recent ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF171717))
@@ -496,7 +496,7 @@ private fun RomPickerScreen(
                 )
             }
 
-            items(compatibleRoms, key = { it.path }) { compatible ->
+            items(compatibleRoms, key = { "compatible:${compatibleKey(it)}" }) { compatible ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF14161A))
@@ -541,3 +541,7 @@ private fun RomPickerScreen(
         }
     }
 }
+
+private fun recentKey(recent: RecentRom): String = "${recent.romId}:${recent.path}"
+
+private fun compatibleKey(compatible: CompatibleRom): String = compatible.path

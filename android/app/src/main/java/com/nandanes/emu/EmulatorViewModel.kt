@@ -58,30 +58,36 @@ class EmulatorViewModel(application: Application) : AndroidViewModel(application
 
     fun refreshRomLists() {
         recentRomStore.pruneMissingFiles()
+        val recentRoms = recentRomStore.list().distinctBy { it.path }
+        val compatibleRoms = romLibraryRepository.listCompatibleRoms().distinctBy { it.path }
         _uiState.update {
             it.copy(
-                recentRoms = recentRomStore.list(),
-                compatibleRoms = romLibraryRepository.listCompatibleRoms()
+                recentRoms = recentRoms,
+                compatibleRoms = compatibleRoms
             )
         }
     }
 
     fun onRomLoaded(romId: String, displayLabel: String, path: String) {
         recentRomStore.record(romId, displayLabel, path)
+        val recentRoms = recentRomStore.list().distinctBy { it.path }
+        val compatibleRoms = romLibraryRepository.listCompatibleRoms().distinctBy { it.path }
         _uiState.value = RomUiState(
             romLoaded = true,
             romId = romId,
             romLabel = displayLabel,
             romPath = path,
-            recentRoms = recentRomStore.list(),
-            compatibleRoms = romLibraryRepository.listCompatibleRoms()
+            recentRoms = recentRoms,
+            compatibleRoms = compatibleRoms
         )
     }
 
     fun onRomClosed() {
+        val recentRoms = recentRomStore.list().distinctBy { it.path }
+        val compatibleRoms = romLibraryRepository.listCompatibleRoms().distinctBy { it.path }
         _uiState.value = RomUiState(
-            recentRoms = recentRomStore.list(),
-            compatibleRoms = romLibraryRepository.listCompatibleRoms()
+            recentRoms = recentRoms,
+            compatibleRoms = compatibleRoms
         )
     }
 

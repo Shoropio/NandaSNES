@@ -27,7 +27,6 @@ import com.nandanes.emu.domain.usecase.SaveStateRuntime
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
-import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -246,11 +245,11 @@ class AudioPlayer(
     private val context: Context,
     private val bridge: NativeBridge
 ) {
-    private val executor = Executors.newSingleThreadExecutor()
     private val readBuffer = ShortArray(AUDIO_READ_CHUNK_SAMPLES)
     private var resampleBuffer = ShortArray(0)
     @Volatile private var running = false
     @Volatile private var playbackToken = 0
+    @Volatile private var playbackThread: Thread? = null
     private var audioTrack: AudioTrack? = null
     private var sourceSampleRate: Int = 0
     private var outputSampleRate: Int = 0
@@ -270,12 +269,13 @@ class AudioPlayer(
             "AUDIO",
             "Playback start sourceRate=$sourceSampleRate outputRate=$outputSampleRate token=$token"
         )
-        repeat(25) {
-            if (bridge.getPendingAudioSamples() >= primeTargetSamples) return@repeat
+        for (attempt in 0 until 25) {
+            if (!running || playbackToken != token) return
+            if (bridge.getPendingAudioSamples() >= primeTargetSamples) break
             Thread.sleep(8)
         }
         track.play()
-        executor.execute {
+        playbackThread = Thread {
             val silenceChunk = ShortArray(4096)
             while (running && playbackToken == token) {
                 val sampleCount = bridge.consumeAudioSamples(readBuffer, readBuffer.size)
@@ -287,17 +287,21 @@ class AudioPlayer(
                             inRate = sourceSampleRate,
                             outRate = outputSampleRate
                         )
-                        track.write(resampleBuffer, 0, writeLength, AudioTrack.WRITE_BLOCKING)
+                        track.write(resampleBuffer, 0, writeLength, AudioTrack.WRITE_NON_BLOCKING)
                     } else {
-                        track.write(readBuffer, 0, sampleCount, AudioTrack.WRITE_BLOCKING)
+                        track.write(readBuffer, 0, sampleCount, AudioTrack.WRITE_NON_BLOCKING)
                     }
                 } else {
                     Thread.sleep(3)
                     if (!running || playbackToken != token) break
-                    track.write(silenceChunk, 0, silenceChunk.size, AudioTrack.WRITE_BLOCKING)
+                    track.write(silenceChunk, 0, silenceChunk.size, AudioTrack.WRITE_NON_BLOCKING)
                 }
             }
             EmulatorDebug.log("AUDIO", "Playback loop stop token=$token running=$running")
+        }.apply {
+            name = "NandaSNES-Audio"
+            isDaemon = true
+            start()
         }
     }
 
@@ -306,6 +310,7 @@ class AudioPlayer(
         playbackToken++
         audioTrack?.pause()
         audioTrack?.flush()
+        playbackThread = null
         EmulatorDebug.log("AUDIO", "Playback stop")
     }
 
@@ -322,7 +327,6 @@ class AudioPlayer(
         stop()
         audioTrack?.release()
         audioTrack = null
-        executor.shutdownNow()
     }
 
     private fun ensureTrack() {
