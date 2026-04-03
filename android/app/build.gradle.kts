@@ -1,12 +1,48 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use(keystoreProperties::load)
+}
+
+fun signingValue(propertyKey: String, envKey: String): String? {
+    val propertyValue = keystoreProperties.getProperty(propertyKey)?.takeIf { it.isNotBlank() }
+    val environmentValue = System.getenv(envKey)?.takeIf { it.isNotBlank() }
+    return propertyValue ?: environmentValue
+}
+
+val releaseStoreFile = signingValue("storeFile", "NANDANES_STORE_FILE")?.let(::file)
+val releaseStorePassword = signingValue("storePassword", "NANDANES_STORE_PASSWORD")
+val releaseKeyAlias = signingValue("keyAlias", "NANDANES_KEY_ALIAS")
+val releaseKeyPassword = signingValue("keyPassword", "NANDANES_KEY_PASSWORD")
+val hasReleaseSigning =
+    releaseStoreFile?.exists() == true &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank()
+
 android {
     namespace = "com.nandanes.emu"
     compileSdk = 35
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.nandanes.emu"
@@ -29,6 +65,9 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             isJniDebuggable = true
@@ -59,6 +98,21 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+tasks.register("printReleaseSigningStatus") {
+    group = "help"
+    description = "Prints whether release signing is configured for this build."
+    doLast {
+        if (hasReleaseSigning) {
+            println("Release signing is configured.")
+            println("Keystore: ${releaseStoreFile?.absolutePath}")
+            println("Key alias: $releaseKeyAlias")
+        } else {
+            println("Release signing is NOT configured.")
+            println("Provide android/keystore.properties or NANDANES_* environment variables.")
+        }
     }
 }
 

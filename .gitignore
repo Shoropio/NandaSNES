@@ -12,6 +12,9 @@ Nuevo Documento de texto.txt
 /android/.idea/
 /android/.kotlin/
 /android/local.properties
+/android/keystore.properties
+/android/*.jks
+/android/*.keystore
 /android/**/build/
 /android/**/.cxx/
 /android/captures/
@@ -22,4 +25,3 @@ Nuevo Documento de texto.txt
 *.ap_
 *.dex
 *.so
-

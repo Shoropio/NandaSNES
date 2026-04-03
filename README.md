@@ -73,6 +73,7 @@ cd android
 
 - Generated folders such as `.gradle`, `.idea`, `build`, and `.cxx` are intentionally ignored.
 - `local.properties` is local-only and must not be committed.
+- Release signing is configured via local `android/keystore.properties` or `NANDANES_*` environment variables.
 - If you update the emulator core, keep the submodule pointer in sync and verify `android/app/src/main/cpp/CMakeLists.txt`.
 - Saves, states, and debug settings are stored locally by the app and are not intended to be versioned.
 
@@ -83,4 +84,3 @@ The refactored Android project has been verified with:
 ```bat
 .\gradlew.bat :app:assembleDebug
 ```
-

@@ -68,4 +68,5 @@ git submodule update --init --recursive
 ## Mantenimiento
 
 - No se deben versionar `.gradle`, `.idea`, `build`, `.cxx` ni `local.properties`.
+- La firma de release debe configurarse fuera de Git usando `keystore.properties` o variables de entorno.
 - Si actualizas `snes9x`, valida compatibilidad con `CMakeLists.txt` y con el bridge JNI.
