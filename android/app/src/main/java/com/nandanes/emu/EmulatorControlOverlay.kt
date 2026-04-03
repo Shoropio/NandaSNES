@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
@@ -197,8 +198,8 @@ fun EmulatorOverlay(
                 editorLabel = "Start / Select"
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    RetroSystemGlyphButton("\u25A1", SnesKey.SELECT, onPress, onRelease, centerButtonHeight, centerAlpha)
-                    RetroSystemGlyphButton("\u25B7", SnesKey.START, onPress, onRelease, centerButtonHeight, centerAlpha)
+                    RetroGhostPillButton("SELECT", SnesKey.SELECT, onPress, onRelease, centerButtonWidth, centerButtonHeight, centerAlpha)
+                    RetroGhostPillButton("START", SnesKey.START, onPress, onRelease, centerButtonWidth, centerButtonHeight, centerAlpha)
                 }
             }
         }
@@ -681,25 +682,18 @@ private fun DpadArrowButton(
 ) {
     var pressed by remember { mutableStateOf(false) }
     val shape = when (label) {
-        "\u2191" -> RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 10.dp, bottomEnd = 10.dp)
-        "\u2193" -> RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp, bottomStart = 20.dp, bottomEnd = 20.dp)
-        "\u2190" -> RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 10.dp, bottomEnd = 10.dp)
-        "\u2192" -> RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp, topEnd = 20.dp, bottomEnd = 20.dp)
-        else -> RoundedCornerShape(18.dp)
+        "\u2191" -> CutCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
+        "\u2193" -> CutCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 4.dp)
+        "\u2190" -> CutCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp)
+        "\u2192" -> CutCornerShape(topStart = 16.dp, bottomStart = 16.dp, topEnd = 4.dp, bottomEnd = 4.dp)
+        else -> CutCornerShape(12.dp)
     }
     Box(
         modifier = Modifier
             .size(buttonWidth, buttonHeight)
             .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = if (pressed) 0.06f else 0.02f),
-                        Color.Transparent
-                    )
-                )
-            )
-            .border(2.dp, Color(0xFF8E95A3).copy(alpha = opacity * if (pressed) 1f else 0.8f), shape)
+            .background(if (pressed) Color(0x10181B21) else Color.Transparent)
+            .border(1.6.dp, Color(0xFF9CA3AE).copy(alpha = opacity * if (pressed) 0.95f else 0.72f), shape)
             .pointerInteropFilter {
                 when (it.actionMasked) {
                     MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
@@ -721,9 +715,9 @@ private fun DpadArrowButton(
     ) {
         Text(
             label,
-            color = Color(0xFFD7DCE6).copy(alpha = opacity),
+            color = Color(0xFF777D88).copy(alpha = opacity * if (pressed) 1f else 0.82f),
             style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Black
+            fontWeight = FontWeight.Bold
         )
     }
 }
@@ -862,22 +856,23 @@ private fun RetroPillButton(
 
 @Composable
 @OptIn(ExperimentalComposeUiApi::class)
-private fun RetroSystemGlyphButton(
+private fun RetroGhostPillButton(
     label: String,
     key: SnesKey,
     onPress: (SnesKey) -> Unit,
     onRelease: (SnesKey) -> Unit,
-    buttonSize: Dp,
+    buttonWidth: Dp,
+    buttonHeight: Dp,
     opacity: Float
 ) {
     var pressed by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(14.dp)
     Box(
         modifier = Modifier
-            .size(buttonSize, buttonSize * 0.72f)
+            .size(buttonWidth, buttonHeight)
             .clip(shape)
-            .background(if (pressed) Color(0x16181B21) else Color.Transparent)
-            .border(2.dp, Color(0xFF8A909A).copy(alpha = opacity * if (pressed) 1f else 0.85f), shape)
+            .background(if (pressed) Color(0x10181B21) else Color(0x08000000))
+            .border(1.6.dp, Color(0xFF7E8591).copy(alpha = opacity * if (pressed) 0.95f else 0.72f), shape)
             .pointerInteropFilter {
                 when (it.actionMasked) {
                     MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
@@ -899,8 +894,8 @@ private fun RetroSystemGlyphButton(
     ) {
         Text(
             label,
-            color = Color(0xFFD2D7DF).copy(alpha = opacity),
-            style = MaterialTheme.typography.titleMedium,
+            color = Color(0xFF6F7682).copy(alpha = opacity * if (pressed) 1f else 0.82f),
+            style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Black
         )
     }

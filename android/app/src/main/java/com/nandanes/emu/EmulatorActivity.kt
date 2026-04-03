@@ -1,4 +1,4 @@
-package com.nandanes.emu
+﻿package com.nandanes.emu
 
 import android.net.Uri
 import android.os.Bundle
@@ -10,7 +10,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,6 +47,12 @@ import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
+private data class CompatibleRom(
+    val label: String,
+    val path: String,
+    val lastModified: Long
+)
+
 private data class RomUiState(
     val romLoaded: Boolean = false,
     val romId: String = "",
@@ -51,7 +60,8 @@ private data class RomUiState(
     val romPath: String = "",
     val importError: String? = null,
     val slotsRefresh: Int = 0,
-    val recentRoms: List<RecentRom> = emptyList()
+    val recentRoms: List<RecentRom> = emptyList(),
+    val compatibleRoms: List<CompatibleRom> = emptyList()
 )
 
 class EmulatorActivity : ComponentActivity() {
@@ -98,7 +108,7 @@ class EmulatorActivity : ComponentActivity() {
         EmulatorDebug.log("APP", "onCreate")
         bridge.initializeInputMapping()
         refreshDebugLog()
-        refreshRecentRoms()
+        refreshRomLists()
 
         val romPathExtra = intent?.getStringExtra("romPath")
         if (!romPathExtra.isNullOrBlank()) {
@@ -118,22 +128,10 @@ class EmulatorActivity : ComponentActivity() {
                         RomPickerScreen(
                             error = state.importError,
                             recentRoms = state.recentRoms,
-                            debugSettings = debugMode,
-                            debugLog = debugLog,
-                            nativeDebugLog = nativeDebugLog,
+                            compatibleRoms = state.compatibleRoms,
                             onPickRom = { pickRomLauncher.launch(arrayOf("*/*")) },
                             onOpenRecent = { recent -> loadRomFile(File(recent.path), recent.label) },
-                            onToggleDebug = { enabled -> updateDebugMode(enabled) },
-                            onRefreshDebug = { refreshDebugLog() },
-                            onClearDebug = {
-                                EmulatorDebug.clear()
-                                bridge.clearNativeDebugLog()
-                                refreshDebugLog()
-                            },
-                            onCaptureSnapshot = {
-                                captureSnapshot()
-                                refreshDebugLog()
-                            }
+                            onOpenCompatible = { compatible -> loadRomFile(File(compatible.path), compatible.label) }
                         )
                     } else {
                         androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
@@ -263,9 +261,12 @@ class EmulatorActivity : ComponentActivity() {
         ioExecutor.shutdownNow()
     }
 
-    private fun refreshRecentRoms() {
+    private fun refreshRomLists() {
         recentRomStore.pruneMissingFiles()
-        uiState.value = uiState.value.copy(recentRoms = recentRomStore.list())
+        uiState.value = uiState.value.copy(
+            recentRoms = recentRomStore.list(),
+            compatibleRoms = detectCompatibleRoms()
+        )
     }
 
     private fun bumpSlotsRefresh() {
@@ -315,7 +316,7 @@ class EmulatorActivity : ComponentActivity() {
         EmulatorDebug.log("ROM", "Load request file=${file.absolutePath} label=$displayLabel")
         if (!file.exists()) {
             uiState.value = uiState.value.copy(importError = "La ROM no existe")
-            refreshRecentRoms()
+            refreshRomLists()
             return
         }
         if (!isSupportedRomName(file.name)) {
@@ -339,14 +340,15 @@ class EmulatorActivity : ComponentActivity() {
         audioPlayer.start()
         tryLoadLastAutoSaveOnRomStart(romId)
         recentRomStore.record(romId, displayLabel, file.absolutePath)
-        refreshRecentRoms()
+        refreshRomLists()
         uiState.value = RomUiState(
             romLoaded = true,
             romId = romId,
             romLabel = displayLabel,
             romPath = file.absolutePath,
             importError = null,
-            recentRoms = recentRomStore.list()
+            recentRoms = recentRomStore.list(),
+            compatibleRoms = detectCompatibleRoms()
         )
         refreshDebugLog()
     }
@@ -417,12 +419,35 @@ class EmulatorActivity : ComponentActivity() {
         }
         bridge.stopEmulation()
         bridge.unloadRom()
-        refreshRecentRoms()
+        refreshRomLists()
         uiState.value = RomUiState(
             romLoaded = false,
-            recentRoms = recentRomStore.list()
+            recentRoms = recentRomStore.list(),
+            compatibleRoms = detectCompatibleRoms()
         )
         refreshDebugLog()
+    }
+
+    private fun detectCompatibleRoms(): List<CompatibleRom> {
+        val knownLabels = buildMap<String, String> {
+            recentRomStore.list().forEach { put(it.path, it.label) }
+        }
+        val importedDir = File(filesDir, "rom_imports")
+        if (!importedDir.exists()) return emptyList()
+
+        return importedDir.listFiles()
+            .orEmpty()
+            .asSequence()
+            .filter { it.isFile && isSupportedRomName(it.name) }
+            .map { file ->
+                CompatibleRom(
+                    label = knownLabels[file.absolutePath] ?: file.nameWithoutExtension,
+                    path = file.absolutePath,
+                    lastModified = file.lastModified()
+                )
+            }
+            .sortedByDescending { it.lastModified }
+            .toList()
     }
 }
 
@@ -446,15 +471,10 @@ private fun romIdFromPath(file: File): String {
 private fun RomPickerScreen(
     error: String?,
     recentRoms: List<RecentRom>,
-    debugSettings: DebugSettings,
-    debugLog: String,
-    nativeDebugLog: String,
+    compatibleRoms: List<CompatibleRom>,
     onPickRom: () -> Unit,
     onOpenRecent: (RecentRom) -> Unit,
-    onToggleDebug: (Boolean) -> Unit,
-    onRefreshDebug: () -> Unit,
-    onClearDebug: () -> Unit,
-    onCaptureSnapshot: () -> Unit
+    onOpenCompatible: (CompatibleRom) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -466,10 +486,19 @@ private fun RomPickerScreen(
     ) {
         item {
             Spacer(modifier = Modifier.height(32.dp))
+            Box(
+                modifier = Modifier
+                    .border(2.dp, Color(0xFF5D4FA3), RoundedCornerShape(22.dp))
+                    .background(Color(0xFF13161C), RoundedCornerShape(22.dp))
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                Text("NN", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+            }
+            Spacer(modifier = Modifier.height(14.dp))
             Text("NandaNes", style = MaterialTheme.typography.headlineMedium, color = Color.White)
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                "¿Qué pasa, chavales? ¿Todo bien? ¿Todo correcto? Y yo que me alegro.",
+                "Emulador de SNES para Android con overlay tactil y guardado rapido.",
                 color = Color.LightGray
             )
             Spacer(modifier = Modifier.height(18.dp))
@@ -479,36 +508,6 @@ private fun RomPickerScreen(
                 Text(it, color = Color(0xFFFF7A7A))
             }
             Spacer(modifier = Modifier.height(20.dp))
-        }
-
-        item {
-            DebugPanelCard(
-                enabled = debugSettings.enabled,
-                logText = debugLog,
-                nativeLogText = nativeDebugLog,
-                nativeSnapshot = "Abre una ROM para capturar snapshot nativo.",
-                onToggleEnabled = onToggleDebug,
-                onRefresh = onRefreshDebug,
-                onClear = onClearDebug,
-                onCaptureSnapshot = onCaptureSnapshot
-            )
-        }
-
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF12151B))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("Acerca de", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                    AboutPanelContent()
-                }
-            }
         }
 
         if (recentRoms.isNotEmpty()) {
@@ -548,56 +547,61 @@ private fun RomPickerScreen(
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun DebugPanelCard(
-    enabled: Boolean,
-    logText: String,
-    nativeLogText: String,
-    nativeSnapshot: String,
-    onToggleEnabled: (Boolean) -> Unit,
-    onRefresh: () -> Unit,
-    onClear: () -> Unit,
-    onCaptureSnapshot: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF15171C))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            androidx.compose.foundation.layout.Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Modo Debug", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                    Text("Guarda eventos Kotlin/JNI y ayuda a ubicar en que paso falla la emulacion.", color = Color.LightGray)
+        if (compatibleRoms.isNotEmpty()) {
+            item {
+                Text(
+                    "Juegos compatibles en el dispositivo",
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            items(compatibleRoms, key = { it.path }) { compatible ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF14161A))
+                ) {
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(compatible.label, color = Color.White, maxLines = 1)
+                            Text(
+                                "Compatible: ${SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(compatible.lastModified))}",
+                                color = Color.LightGray,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Button(onClick = { onOpenCompatible(compatible) }) { Text("Abrir") }
+                    }
                 }
-                Switch(checked = enabled, onCheckedChange = onToggleEnabled)
             }
-            androidx.compose.foundation.layout.Row(
+        }
+
+        item {
+            Card(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF12151B))
             ) {
-                Button(onClick = onRefresh, modifier = Modifier.weight(1f)) { Text("Refrescar") }
-                Button(onClick = onCaptureSnapshot, modifier = Modifier.weight(1f)) { Text("Snapshot") }
-                Button(onClick = onClear, modifier = Modifier.weight(1f)) { Text("Borrar") }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Acerca de", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    AboutPanelContent()
+                }
             }
-            Text("Estado nativo", color = Color.White, style = MaterialTheme.typography.labelLarge)
-            Text(nativeSnapshot, color = Color(0xFFB9C1CC), style = MaterialTheme.typography.bodySmall)
-            Text("Log nativo", color = Color.White, style = MaterialTheme.typography.labelLarge)
-            Text(nativeLogText, color = Color(0xFFE0C79B), style = MaterialTheme.typography.bodySmall)
-            Text("Log reciente", color = Color.White, style = MaterialTheme.typography.labelLarge)
-            Text(logText, color = Color(0xFFB9C1CC), style = MaterialTheme.typography.bodySmall)
-            Text(EmulatorDebug.logPath(), color = Color(0xFF7E8794), style = MaterialTheme.typography.labelSmall)
         }
     }
 }
+
