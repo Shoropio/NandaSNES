@@ -1,32 +1,71 @@
-## NandaNes Android (NDK + Compose)
+## NandaNes Android
 
-### Que incluye
-- `app/src/main/java/com/nandanes/emu/EmulatorControlsAndSave.kt`: UI Compose, importacion de ROM, controles tactiles, render de video, audio, save states y auto-save.
-- `app/src/main/java/com/nandanes/emu/RecentRomStore.kt`: persistencia de ROMs recientes.
-- `app/src/main/cpp/nandanes_jni_bridge.cpp`: puente JNI hacia input, video, audio y save/load del core.
-- `third_party/snes9x`: core clonado (official upstream), enlazado desde CMake.
+Aplicacion Android del proyecto, construida con Kotlin, Jetpack Compose, NDK y un bridge JNI hacia el core `snes9x`.
 
-### Estado actual
-- Video visible en pantalla via una vista Android que consume frames ARGB del core.
-- Audio PCM reproducido con `AudioTrack`.
-- Slots manuales + auto-save con debounce y reemplazo por archivo temporal.
-- Importacion de ROMs `.sfc`, `.smc` y `.fig`.
-- Historial de ROMs recientes para reabrir sesiones rapido.
+## Estructura actual
 
-### Build en Windows
-El wrapper de Gradle ya esta incluido.
+### Presentation
 
-Opciones:
-- **Android Studio**: abre la carpeta `android/` como proyecto. Android Studio sincronizara el wrapper y el SDK/NDK necesarios.
-- **CLI**:
-  1) Asegura Android SDK + NDK configurados en tu entorno
-  2) En `android/` ejecuta:
+- `app/src/main/java/com/nandanes/emu/EmulatorActivity.kt`
+- `app/src/main/java/com/nandanes/emu/EmulatorViewModel.kt`
+- `app/src/main/java/com/nandanes/emu/EmulatorControlOverlay.kt`
+- `app/src/main/java/com/nandanes/emu/SaveStatePanel.kt`
+
+### Domain
+
+- `app/src/main/java/com/nandanes/emu/domain/usecase/EmulationUseCases.kt`
+
+### Data
+
+- `app/src/main/java/com/nandanes/emu/data/rom/`
+- `app/src/main/java/com/nandanes/emu/data/save/`
+- `app/src/main/java/com/nandanes/emu/data/settings/`
+
+### Runtime
+
+- `app/src/main/java/com/nandanes/emu/runtime/EmulatorRuntime.kt`
+- `app/src/main/cpp/nandanes_jni_bridge.cpp`
+
+## Funcionalidad actual
+
+- Selector de ROMs con historial reciente
+- Overlay tactil configurable
+- Render de video desde el core nativo
+- Audio PCM con `AudioTrack`
+- Save states manuales y autosave
+- Persistencia de settings con `DataStore`
+- Utilidades de debug con activacion controlada
+
+## Requisitos
+
+- JDK 17
+- Android SDK
+- Android NDK
+- CMake 3.22.1
+
+## Build
+
+### Android Studio
+
+Abre la carpeta `android/` como proyecto. Android Studio resolvera Gradle, SDK y NDK.
+
+### CLI en Windows
 
 ```bat
 .\gradlew.bat :app:assembleDebug
 ```
 
-### Estado de integracion del core
-- `app/src/main/cpp/CMakeLists.txt` compila el conjunto `libretro` de Snes9x como `snes9xcore` (static).
-- `nandanes` enlaza esa libreria y expone las llamadas JNI desde Android.
-- Si actualizas `third_party/snes9x`, revisa que no cambie la lista de fuentes en CMake.
+## Core nativo
+
+- `app/src/main/cpp/CMakeLists.txt` compila `snes9x` como libreria estatica.
+- El core vive en `../third_party/snes9x` respecto a esta carpeta.
+- Si clonas el repo desde cero, inicializa submodulos antes de compilar:
+
+```bash
+git submodule update --init --recursive
+```
+
+## Mantenimiento
+
+- No se deben versionar `.gradle`, `.idea`, `build`, `.cxx` ni `local.properties`.
+- Si actualizas `snes9x`, valida compatibilidad con `CMakeLists.txt` y con el bridge JNI.
