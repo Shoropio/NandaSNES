@@ -284,9 +284,9 @@ class EmulatorActivity : ComponentActivity() {
         }
 
         val resolvedRomId = loadResult.romId ?: romId
-        tryLoadLastAutoSaveOnRomStart(resolvedRomId)
         bridge.startEmulation()
         audioPlayer.start()
+        tryLoadLastAutoSaveOnRomStart(resolvedRomId)
         viewModel.onRomLoaded(resolvedRomId, displayLabel, file.absolutePath)
         refreshDebugLog()
     }

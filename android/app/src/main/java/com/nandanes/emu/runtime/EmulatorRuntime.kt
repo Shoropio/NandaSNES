@@ -2,7 +2,6 @@ package com.nandanes.emu.runtime
 
 import android.content.Context
 import android.media.AudioManager
-import android.media.AudioFocusRequest
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -28,6 +27,7 @@ import com.nandanes.emu.domain.usecase.SaveStateRuntime
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -246,81 +246,67 @@ class AudioPlayer(
     private val context: Context,
     private val bridge: NativeBridge
 ) {
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
-        EmulatorDebug.logAlways("AUDIO", "Audio focus changed=$focusChange")
-    }
+    private val executor = Executors.newSingleThreadExecutor()
     private val readBuffer = ShortArray(AUDIO_READ_CHUNK_SAMPLES)
+    private var resampleBuffer = ShortArray(0)
     @Volatile private var running = false
     @Volatile private var playbackToken = 0
-    @Volatile private var playbackThread: Thread? = null
     private var audioTrack: AudioTrack? = null
-    private var audioFocusRequest: AudioFocusRequest? = null
     private var sourceSampleRate: Int = 0
+    private var outputSampleRate: Int = 0
 
     fun start() {
         if (running || !bridge.isRomLoaded()) return
         ensureTrack()
         val track = audioTrack ?: return
         if (track.state != AudioTrack.STATE_INITIALIZED) {
-            EmulatorDebug.logAlways("AUDIO", "AudioTrack not initialized at sourceSampleRate=$sourceSampleRate")
+            EmulatorDebug.log("AUDIO", "AudioTrack not initialized at outputSampleRate=$outputSampleRate")
             return
         }
         running = true
         val token = ++playbackToken
         val primeTargetSamples = max(sourceSampleRate / 8, 4096)
-        val focusGranted = requestAudioFocus()
-        EmulatorDebug.logAlways(
+        EmulatorDebug.log(
             "AUDIO",
-            "Playback start sourceRate=$sourceSampleRate token=$token focusGranted=$focusGranted"
+            "Playback start sourceRate=$sourceSampleRate outputRate=$outputSampleRate token=$token"
         )
-        for (attempt in 0 until 25) {
-            if (!running || playbackToken != token) return
-            if (bridge.getPendingAudioSamples() >= primeTargetSamples) break
+        repeat(25) {
+            if (bridge.getPendingAudioSamples() >= primeTargetSamples) return@repeat
             Thread.sleep(8)
         }
         track.play()
-        EmulatorDebug.logAlways(
-            "AUDIO",
-            "AudioTrack playState=${track.playState} pending=${bridge.getPendingAudioSamples()} token=$token"
-        )
-        playbackThread = Thread {
+        executor.execute {
             val silenceChunk = ShortArray(4096)
-            var loopCount = 0
             while (running && playbackToken == token) {
                 val sampleCount = bridge.consumeAudioSamples(readBuffer, readBuffer.size)
                 if (sampleCount > 0) {
-                    writeFully(track, readBuffer, sampleCount, token)
+                    if (sourceSampleRate != outputSampleRate) {
+                        val writeLength = resampleStereo(
+                            input = readBuffer,
+                            sampleCount = sampleCount,
+                            inRate = sourceSampleRate,
+                            outRate = outputSampleRate
+                        )
+                        track.write(resampleBuffer, 0, writeLength, AudioTrack.WRITE_BLOCKING)
+                    } else {
+                        track.write(readBuffer, 0, sampleCount, AudioTrack.WRITE_BLOCKING)
+                    }
                 } else {
                     Thread.sleep(3)
                     if (!running || playbackToken != token) break
-                    writeFully(track, silenceChunk, silenceChunk.size, token)
-                }
-                loopCount++
-                if (loopCount % 240 == 0) {
-                    EmulatorDebug.log(
-                        "AUDIO",
-                        "Loop token=$token pending=${bridge.getPendingAudioSamples()} playState=${track.playState}"
-                    )
+                    track.write(silenceChunk, 0, silenceChunk.size, AudioTrack.WRITE_BLOCKING)
                 }
             }
-            EmulatorDebug.logAlways("AUDIO", "Playback loop stop token=$token running=$running")
-        }.apply {
-            name = "NandaSNES-Audio"
-            isDaemon = true
-            start()
+            EmulatorDebug.log("AUDIO", "Playback loop stop token=$token running=$running")
         }
     }
 
     fun stop() {
         running = false
         playbackToken++
-        playbackThread?.interrupt()
         audioTrack?.pause()
         audioTrack?.flush()
-        abandonAudioFocus()
-        playbackThread = null
-        EmulatorDebug.logAlways("AUDIO", "Playback stop")
+        EmulatorDebug.log("AUDIO", "Playback stop")
     }
 
     fun resetForNextRom() {
@@ -328,6 +314,7 @@ class AudioPlayer(
         audioTrack?.release()
         audioTrack = null
         sourceSampleRate = 0
+        outputSampleRate = 0
         EmulatorDebug.logAlways("AUDIO", "Audio reset for next ROM")
     }
 
@@ -335,100 +322,97 @@ class AudioPlayer(
         stop()
         audioTrack?.release()
         audioTrack = null
+        executor.shutdownNow()
     }
 
     private fun ensureTrack() {
         val sourceRate = bridge.getAudioSampleRate().takeIf { it > 0 } ?: DEFAULT_SAMPLE_RATE
-        if (audioTrack != null && sourceSampleRate == sourceRate) return
+        val deviceRate = deviceOutputSampleRate()
+        if (audioTrack != null && sourceSampleRate == sourceRate && outputSampleRate == deviceRate) return
 
         audioTrack?.release()
         sourceSampleRate = sourceRate
+        outputSampleRate = deviceRate
         val minSize = AudioTrack.getMinBufferSize(
-            sourceSampleRate,
+            outputSampleRate,
             AudioFormat.CHANNEL_OUT_STEREO,
             AudioFormat.ENCODING_PCM_16BIT
         )
-        val bufferSize = max(minSize * 2, (sourceSampleRate / 4) * 4)
-        @Suppress("DEPRECATION")
-        audioTrack = AudioTrack(
-            AudioManager.STREAM_MUSIC,
-            sourceSampleRate,
-            AudioFormat.CHANNEL_OUT_STEREO,
-            AudioFormat.ENCODING_PCM_16BIT,
-            bufferSize,
-            AudioTrack.MODE_STREAM
-        )
-        audioTrack?.setVolume(1.0f)
-        EmulatorDebug.logAlways(
+        val bufferSize = max(minSize * 2, (outputSampleRate / 4) * 4)
+        val builder = AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(outputSampleRate)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                    .build()
+            )
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .setBufferSizeInBytes(bufferSize)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+        }
+        audioTrack = builder.build()
+        EmulatorDebug.log(
             "AUDIO",
-            "AudioTrack prepared sourceRate=$sourceSampleRate bufferSize=$bufferSize minSize=$minSize state=${audioTrack?.state} mode=direct"
+            "AudioTrack prepared sourceRate=$sourceSampleRate outputRate=$outputSampleRate bufferSize=$bufferSize"
         )
     }
 
-    private fun requestAudioFocus(): Boolean {
-        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setOnAudioFocusChangeListener(audioFocusListener)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_GAME)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build()
-                )
-                .build()
-            audioFocusRequest = request
-            audioManager.requestAudioFocus(request)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(
-                audioFocusListener,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN
-            )
-        }
-        EmulatorDebug.logAlways("AUDIO", "Audio focus request result=$result")
-        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    private fun deviceOutputSampleRate(): Int {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val value = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
+        return value?.toIntOrNull()?.takeIf { it > 0 } ?: DEFAULT_OUTPUT_SAMPLE_RATE
     }
 
-    private fun abandonAudioFocus() {
-        val request = audioFocusRequest
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && request != null) {
-            audioManager.abandonAudioFocusRequest(request)
-            audioFocusRequest = null
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.abandonAudioFocus(audioFocusListener)
+    private fun ensureResampleCapacity(requiredSamples: Int) {
+        if (resampleBuffer.size < requiredSamples) {
+            resampleBuffer = ShortArray(requiredSamples)
         }
     }
 
-    private fun writeFully(track: AudioTrack, buffer: ShortArray, totalSamples: Int, token: Int) {
-        var offset = 0
-        while (offset < totalSamples && running && playbackToken == token) {
-            val wrote = track.write(
-                buffer,
-                offset,
-                totalSamples - offset,
-                AudioTrack.WRITE_BLOCKING
-            )
-            when {
-                wrote > 0 -> {
-                    offset += wrote
-                }
-                wrote == 0 -> Thread.sleep(2)
-                else -> {
-                    EmulatorDebug.logAlways(
-                        "AUDIO",
-                        "AudioTrack write error code=$wrote token=$token playState=${track.playState}"
-                    )
-                    return
-                }
-            }
+    private fun resampleStereo(input: ShortArray, sampleCount: Int, inRate: Int, outRate: Int): Int {
+        if (sampleCount <= 0 || inRate <= 0 || outRate <= 0 || inRate == outRate) {
+            ensureResampleCapacity(sampleCount)
+            input.copyInto(resampleBuffer, endIndex = sampleCount)
+            return sampleCount
         }
+        val inputFrames = sampleCount / 2
+        if (inputFrames <= 1) {
+            ensureResampleCapacity(sampleCount)
+            input.copyInto(resampleBuffer, endIndex = sampleCount)
+            return sampleCount
+        }
+        val outputFrames = max(1, ((inputFrames.toDouble() * outRate) / inRate).roundToInt())
+        val outputSamples = outputFrames * 2
+        ensureResampleCapacity(outputSamples)
+        val step = inRate.toDouble() / outRate.toDouble()
+        var position = 0.0
+        for (frame in 0 until outputFrames) {
+            val base = position.toInt().coerceIn(0, inputFrames - 1)
+            val next = (base + 1).coerceAtMost(inputFrames - 1)
+            val frac = position - base
+            val left0 = input[base * 2].toInt()
+            val right0 = input[base * 2 + 1].toInt()
+            val left1 = input[next * 2].toInt()
+            val right1 = input[next * 2 + 1].toInt()
+            resampleBuffer[frame * 2] = (left0 + ((left1 - left0) * frac)).roundToInt().toShort()
+            resampleBuffer[frame * 2 + 1] = (right0 + ((right1 - right0) * frac)).roundToInt().toShort()
+            position += step
+        }
+        return outputSamples
     }
 
     private companion object {
         private const val AUDIO_READ_CHUNK_SAMPLES = 8192
         private const val DEFAULT_SAMPLE_RATE = 32040
+        private const val DEFAULT_OUTPUT_SAMPLE_RATE = 48000
     }
 }
 
