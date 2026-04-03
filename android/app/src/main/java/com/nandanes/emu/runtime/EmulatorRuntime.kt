@@ -2,6 +2,7 @@ package com.nandanes.emu.runtime
 
 import android.content.Context
 import android.media.AudioManager
+import android.media.AudioFocusRequest
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -245,11 +246,16 @@ class AudioPlayer(
     private val context: Context,
     private val bridge: NativeBridge
 ) {
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        EmulatorDebug.logAlways("AUDIO", "Audio focus changed=$focusChange")
+    }
     private val readBuffer = ShortArray(AUDIO_READ_CHUNK_SAMPLES)
     @Volatile private var running = false
     @Volatile private var playbackToken = 0
     @Volatile private var playbackThread: Thread? = null
     private var audioTrack: AudioTrack? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
     private var sourceSampleRate: Int = 0
 
     fun start() {
@@ -263,9 +269,10 @@ class AudioPlayer(
         running = true
         val token = ++playbackToken
         val primeTargetSamples = max(sourceSampleRate / 8, 4096)
+        val focusGranted = requestAudioFocus()
         EmulatorDebug.logAlways(
             "AUDIO",
-            "Playback start sourceRate=$sourceSampleRate token=$token"
+            "Playback start sourceRate=$sourceSampleRate token=$token focusGranted=$focusGranted"
         )
         for (attempt in 0 until 25) {
             if (!running || playbackToken != token) return
@@ -311,6 +318,7 @@ class AudioPlayer(
         playbackThread?.interrupt()
         audioTrack?.pause()
         audioTrack?.flush()
+        abandonAudioFocus()
         playbackThread = null
         EmulatorDebug.logAlways("AUDIO", "Playback stop")
     }
@@ -355,6 +363,42 @@ class AudioPlayer(
             "AUDIO",
             "AudioTrack prepared sourceRate=$sourceSampleRate bufferSize=$bufferSize minSize=$minSize state=${audioTrack?.state} mode=direct"
         )
+    }
+
+    private fun requestAudioFocus(): Boolean {
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setOnAudioFocusChangeListener(audioFocusListener)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_GAME)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .build()
+            audioFocusRequest = request
+            audioManager.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                audioFocusListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            )
+        }
+        EmulatorDebug.logAlways("AUDIO", "Audio focus request result=$result")
+        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+
+    private fun abandonAudioFocus() {
+        val request = audioFocusRequest
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && request != null) {
+            audioManager.abandonAudioFocusRequest(request)
+            audioFocusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(audioFocusListener)
+        }
     }
 
     private fun writeFully(track: AudioTrack, buffer: ShortArray, totalSamples: Int, token: Int) {
