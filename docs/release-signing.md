@@ -13,7 +13,7 @@ Copy-Item android\keystore.properties.example android\keystore.properties
 Fill it with your local values:
 
 ```properties
-storeFile=C:/secure/path/nandanes-release.jks
+storeFile=C:/secure/path/nandasnes-release.jks
 storePassword=your-store-password
 keyAlias=nandanes
 keyPassword=your-key-password
@@ -54,7 +54,7 @@ Example using `keytool`:
 
 ```powershell
 keytool -genkeypair -v `
-  -keystore C:\secure\path\nandanes-release.jks `
+  -keystore C:\secure\path\nandasnes-release.jks `
   -alias nandanes `
   -keyalg RSA `
   -keysize 4096 `

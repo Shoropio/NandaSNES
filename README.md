@@ -52,8 +52,8 @@ Important: the current GitHub repository URL may still use the legacy `NandaNes`
 Clone the repository with submodules so the native core is available:
 
 ```bash
-git clone --recurse-submodules https://github.com/Shoropio/NandaNes.git
-cd NandaNes
+git clone --recurse-submodules <repo-url>
+cd <repo-folder>
 ```
 
 If you already cloned it without submodules:
