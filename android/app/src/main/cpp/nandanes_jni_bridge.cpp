@@ -569,7 +569,7 @@ auto RunOnCoreThreadSync(Fn &&fn) -> decltype(fn()) {
 } // namespace
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_nandanes_emu_NativeBridge_initializeInputMapping(
+Java_com_nandanes_emu_runtime_NativeBridge_initializeInputMapping(
     JNIEnv *env,
     jobject /*thiz*/) {
     (void) env;
@@ -577,7 +577,7 @@ Java_com_nandanes_emu_NativeBridge_initializeInputMapping(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_nandanes_emu_NativeBridge_loadRom(
+Java_com_nandanes_emu_runtime_NativeBridge_loadRom(
     JNIEnv *env,
     jobject /*thiz*/,
     jstring romPath) {
@@ -656,7 +656,7 @@ Java_com_nandanes_emu_NativeBridge_loadRom(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_nandanes_emu_NativeBridge_unloadRom(
+Java_com_nandanes_emu_runtime_NativeBridge_unloadRom(
     JNIEnv *env,
     jobject /*thiz*/) {
     (void) env;
@@ -668,7 +668,7 @@ Java_com_nandanes_emu_NativeBridge_unloadRom(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_nandanes_emu_NativeBridge_startEmulation(
+Java_com_nandanes_emu_runtime_NativeBridge_startEmulation(
     JNIEnv *env,
     jobject /*thiz*/) {
     (void) env;
@@ -680,7 +680,7 @@ Java_com_nandanes_emu_NativeBridge_startEmulation(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_nandanes_emu_NativeBridge_stopEmulation(
+Java_com_nandanes_emu_runtime_NativeBridge_stopEmulation(
     JNIEnv *env,
     jobject /*thiz*/) {
     (void) env;
@@ -692,7 +692,7 @@ Java_com_nandanes_emu_NativeBridge_stopEmulation(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_nandanes_emu_NativeBridge_isRomLoaded(
+Java_com_nandanes_emu_runtime_NativeBridge_isRomLoaded(
     JNIEnv *env,
     jobject /*thiz*/) {
     (void) env;
@@ -700,7 +700,7 @@ Java_com_nandanes_emu_NativeBridge_isRomLoaded(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_nandanes_emu_NativeBridge_reportButton(
+Java_com_nandanes_emu_runtime_NativeBridge_reportButton(
     JNIEnv *env,
     jobject /*thiz*/,
     jint buttonCode,
@@ -720,7 +720,7 @@ Java_com_nandanes_emu_NativeBridge_reportButton(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_nandanes_emu_NativeBridge_saveState(
+Java_com_nandanes_emu_runtime_NativeBridge_saveState(
     JNIEnv *env,
     jobject /*thiz*/,
     jstring path) {
@@ -741,7 +741,7 @@ Java_com_nandanes_emu_NativeBridge_saveState(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_nandanes_emu_NativeBridge_loadState(
+Java_com_nandanes_emu_runtime_NativeBridge_loadState(
     JNIEnv *env,
     jobject /*thiz*/,
     jstring path) {
@@ -762,7 +762,7 @@ Java_com_nandanes_emu_NativeBridge_loadState(
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_nandanes_emu_NativeBridge_getFrameArgb8888(
+Java_com_nandanes_emu_runtime_NativeBridge_getFrameArgb8888(
     JNIEnv *env,
     jobject /*thiz*/) {
     std::lock_guard<std::mutex> lock(gFrameMutex);
@@ -826,7 +826,7 @@ Java_com_nandanes_emu_NativeBridge_getFrameArgb8888(
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_nandanes_emu_NativeBridge_getLatestFrameInfo(
+Java_com_nandanes_emu_runtime_NativeBridge_getLatestFrameInfo(
     JNIEnv *env,
     jobject /*thiz*/) {
     jint out[2];
@@ -842,7 +842,7 @@ Java_com_nandanes_emu_NativeBridge_getLatestFrameInfo(
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_nandanes_emu_NativeBridge_getVideoFrameCount(
+Java_com_nandanes_emu_runtime_NativeBridge_getVideoFrameCount(
     JNIEnv *env,
     jobject /*thiz*/) {
     (void) env;
@@ -850,7 +850,7 @@ Java_com_nandanes_emu_NativeBridge_getVideoFrameCount(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_nandanes_emu_NativeBridge_renderLatestFrameToBitmap(
+Java_com_nandanes_emu_runtime_NativeBridge_renderLatestFrameToBitmap(
     JNIEnv *env,
     jobject /*thiz*/,
     jobject bitmapObj) {
@@ -931,7 +931,7 @@ Java_com_nandanes_emu_NativeBridge_renderLatestFrameToBitmap(
 }
 
 extern "C" JNIEXPORT jshortArray JNICALL
-Java_com_nandanes_emu_NativeBridge_consumeAudioSamples(
+Java_com_nandanes_emu_runtime_NativeBridge_consumeAudioSamples(
     JNIEnv *env,
     jobject /*thiz*/,
     jint maxSamples) {
@@ -956,7 +956,7 @@ Java_com_nandanes_emu_NativeBridge_consumeAudioSamples(
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_nandanes_emu_NativeBridge_consumeAudioSamples__3SI(
+Java_com_nandanes_emu_runtime_NativeBridge_consumeAudioSamples__3SI(
     JNIEnv *env,
     jobject /*thiz*/,
     jshortArray buffer,
@@ -994,7 +994,7 @@ Java_com_nandanes_emu_NativeBridge_consumeAudioSamples__3SI(
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_nandanes_emu_NativeBridge_getPendingAudioSamples(
+Java_com_nandanes_emu_runtime_NativeBridge_getPendingAudioSamples(
     JNIEnv *env,
     jobject /*thiz*/) {
     (void) env;
@@ -1003,7 +1003,7 @@ Java_com_nandanes_emu_NativeBridge_getPendingAudioSamples(
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_nandanes_emu_NativeBridge_getAudioSampleRate(
+Java_com_nandanes_emu_runtime_NativeBridge_getAudioSampleRate(
     JNIEnv *env,
     jobject /*thiz*/) {
     (void) env;
@@ -1011,7 +1011,7 @@ Java_com_nandanes_emu_NativeBridge_getAudioSampleRate(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_nandanes_emu_NativeBridge_setDebugLoggingEnabled(
+Java_com_nandanes_emu_runtime_NativeBridge_setDebugLoggingEnabled(
     JNIEnv *env,
     jobject /*thiz*/,
     jboolean enabled) {
@@ -1021,7 +1021,7 @@ Java_com_nandanes_emu_NativeBridge_setDebugLoggingEnabled(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_nandanes_emu_NativeBridge_getDebugSnapshot(
+Java_com_nandanes_emu_runtime_NativeBridge_getDebugSnapshot(
     JNIEnv *env,
     jobject /*thiz*/) {
     std::string snapshot = "coreInitialized=" + std::to_string(gCoreInitialized.load() ? 1 : 0) +
@@ -1055,7 +1055,7 @@ Java_com_nandanes_emu_NativeBridge_getDebugSnapshot(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_nandanes_emu_NativeBridge_getNativeDebugLog(
+Java_com_nandanes_emu_runtime_NativeBridge_getNativeDebugLog(
     JNIEnv *env,
     jobject /*thiz*/) {
     std::string joined;
@@ -1073,7 +1073,7 @@ Java_com_nandanes_emu_NativeBridge_getNativeDebugLog(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_nandanes_emu_NativeBridge_clearNativeDebugLog(
+Java_com_nandanes_emu_runtime_NativeBridge_clearNativeDebugLog(
     JNIEnv *env,
     jobject /*thiz*/) {
     (void) env;
