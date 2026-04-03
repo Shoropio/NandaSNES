@@ -320,6 +320,7 @@ class AudioPlayer(
     fun stop() {
         running = false
         playbackToken++
+        playbackThread?.interrupt()
         audioTrack?.pause()
         audioTrack?.flush()
         playbackThread = null
@@ -355,30 +356,19 @@ class AudioPlayer(
             AudioFormat.ENCODING_PCM_16BIT
         )
         val bufferSize = max(minSize * 2, (outputSampleRate / 4) * 4)
-        val builder = AudioTrack.Builder()
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_GAME)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setSampleRate(outputSampleRate)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
-                    .build()
-            )
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .setBufferSizeInBytes(bufferSize)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
-        }
-        audioTrack = builder.build()
+        @Suppress("DEPRECATION")
+        audioTrack = AudioTrack(
+            AudioManager.STREAM_MUSIC,
+            outputSampleRate,
+            AudioFormat.CHANNEL_OUT_STEREO,
+            AudioFormat.ENCODING_PCM_16BIT,
+            bufferSize,
+            AudioTrack.MODE_STREAM
+        )
         audioTrack?.setVolume(1.0f)
         EmulatorDebug.logAlways(
             "AUDIO",
-            "AudioTrack prepared sourceRate=$sourceSampleRate outputRate=$outputSampleRate bufferSize=$bufferSize minSize=$minSize state=${audioTrack?.state}"
+            "AudioTrack prepared sourceRate=$sourceSampleRate outputRate=$outputSampleRate bufferSize=$bufferSize minSize=$minSize state=${audioTrack?.state} mode=compat"
         )
     }
 
@@ -396,31 +386,18 @@ class AudioPlayer(
 
     private fun writeFully(track: AudioTrack, buffer: ShortArray, totalSamples: Int, token: Int) {
         var offset = 0
-        var idleWrites = 0
         while (offset < totalSamples && running && playbackToken == token) {
             val wrote = track.write(
                 buffer,
                 offset,
                 totalSamples - offset,
-                AudioTrack.WRITE_NON_BLOCKING
+                AudioTrack.WRITE_BLOCKING
             )
             when {
                 wrote > 0 -> {
                     offset += wrote
-                    idleWrites = 0
                 }
-                wrote == 0 -> {
-                    idleWrites++
-                    if (idleWrites >= 4) {
-                        Thread.sleep(2)
-                    }
-                    if (idleWrites == 25) {
-                        EmulatorDebug.logAlways(
-                            "AUDIO",
-                            "AudioTrack write stalled token=$token playState=${track.playState} pending=${bridge.getPendingAudioSamples()}"
-                        )
-                    }
-                }
+                wrote == 0 -> Thread.sleep(2)
                 else -> {
                     EmulatorDebug.logAlways(
                         "AUDIO",
