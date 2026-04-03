@@ -246,20 +246,18 @@ class AudioPlayer(
     private val bridge: NativeBridge
 ) {
     private val readBuffer = ShortArray(AUDIO_READ_CHUNK_SAMPLES)
-    private var resampleBuffer = ShortArray(0)
     @Volatile private var running = false
     @Volatile private var playbackToken = 0
     @Volatile private var playbackThread: Thread? = null
     private var audioTrack: AudioTrack? = null
     private var sourceSampleRate: Int = 0
-    private var outputSampleRate: Int = 0
 
     fun start() {
         if (running || !bridge.isRomLoaded()) return
         ensureTrack()
         val track = audioTrack ?: return
         if (track.state != AudioTrack.STATE_INITIALIZED) {
-            EmulatorDebug.logAlways("AUDIO", "AudioTrack not initialized at outputSampleRate=$outputSampleRate")
+            EmulatorDebug.logAlways("AUDIO", "AudioTrack not initialized at sourceSampleRate=$sourceSampleRate")
             return
         }
         running = true
@@ -267,7 +265,7 @@ class AudioPlayer(
         val primeTargetSamples = max(sourceSampleRate / 8, 4096)
         EmulatorDebug.logAlways(
             "AUDIO",
-            "Playback start sourceRate=$sourceSampleRate outputRate=$outputSampleRate token=$token"
+            "Playback start sourceRate=$sourceSampleRate token=$token"
         )
         for (attempt in 0 until 25) {
             if (!running || playbackToken != token) return
@@ -285,17 +283,7 @@ class AudioPlayer(
             while (running && playbackToken == token) {
                 val sampleCount = bridge.consumeAudioSamples(readBuffer, readBuffer.size)
                 if (sampleCount > 0) {
-                    if (sourceSampleRate != outputSampleRate) {
-                        val writeLength = resampleStereo(
-                            input = readBuffer,
-                            sampleCount = sampleCount,
-                            inRate = sourceSampleRate,
-                            outRate = outputSampleRate
-                        )
-                        writeFully(track, resampleBuffer, writeLength, token)
-                    } else {
-                        writeFully(track, readBuffer, sampleCount, token)
-                    }
+                    writeFully(track, readBuffer, sampleCount, token)
                 } else {
                     Thread.sleep(3)
                     if (!running || playbackToken != token) break
@@ -332,7 +320,6 @@ class AudioPlayer(
         audioTrack?.release()
         audioTrack = null
         sourceSampleRate = 0
-        outputSampleRate = 0
         EmulatorDebug.logAlways("AUDIO", "Audio reset for next ROM")
     }
 
@@ -344,22 +331,20 @@ class AudioPlayer(
 
     private fun ensureTrack() {
         val sourceRate = bridge.getAudioSampleRate().takeIf { it > 0 } ?: DEFAULT_SAMPLE_RATE
-        val deviceRate = deviceOutputSampleRate()
-        if (audioTrack != null && sourceSampleRate == sourceRate && outputSampleRate == deviceRate) return
+        if (audioTrack != null && sourceSampleRate == sourceRate) return
 
         audioTrack?.release()
         sourceSampleRate = sourceRate
-        outputSampleRate = deviceRate
         val minSize = AudioTrack.getMinBufferSize(
-            outputSampleRate,
+            sourceSampleRate,
             AudioFormat.CHANNEL_OUT_STEREO,
             AudioFormat.ENCODING_PCM_16BIT
         )
-        val bufferSize = max(minSize * 2, (outputSampleRate / 4) * 4)
+        val bufferSize = max(minSize * 2, (sourceSampleRate / 4) * 4)
         @Suppress("DEPRECATION")
         audioTrack = AudioTrack(
             AudioManager.STREAM_MUSIC,
-            outputSampleRate,
+            sourceSampleRate,
             AudioFormat.CHANNEL_OUT_STEREO,
             AudioFormat.ENCODING_PCM_16BIT,
             bufferSize,
@@ -368,20 +353,8 @@ class AudioPlayer(
         audioTrack?.setVolume(1.0f)
         EmulatorDebug.logAlways(
             "AUDIO",
-            "AudioTrack prepared sourceRate=$sourceSampleRate outputRate=$outputSampleRate bufferSize=$bufferSize minSize=$minSize state=${audioTrack?.state} mode=compat"
+            "AudioTrack prepared sourceRate=$sourceSampleRate bufferSize=$bufferSize minSize=$minSize state=${audioTrack?.state} mode=direct"
         )
-    }
-
-    private fun deviceOutputSampleRate(): Int {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val value = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
-        return value?.toIntOrNull()?.takeIf { it > 0 } ?: DEFAULT_OUTPUT_SAMPLE_RATE
-    }
-
-    private fun ensureResampleCapacity(requiredSamples: Int) {
-        if (resampleBuffer.size < requiredSamples) {
-            resampleBuffer = ShortArray(requiredSamples)
-        }
     }
 
     private fun writeFully(track: AudioTrack, buffer: ShortArray, totalSamples: Int, token: Int) {
@@ -409,42 +382,9 @@ class AudioPlayer(
         }
     }
 
-    private fun resampleStereo(input: ShortArray, sampleCount: Int, inRate: Int, outRate: Int): Int {
-        if (sampleCount <= 0 || inRate <= 0 || outRate <= 0 || inRate == outRate) {
-            ensureResampleCapacity(sampleCount)
-            input.copyInto(resampleBuffer, endIndex = sampleCount)
-            return sampleCount
-        }
-        val inputFrames = sampleCount / 2
-        if (inputFrames <= 1) {
-            ensureResampleCapacity(sampleCount)
-            input.copyInto(resampleBuffer, endIndex = sampleCount)
-            return sampleCount
-        }
-        val outputFrames = max(1, ((inputFrames.toDouble() * outRate) / inRate).roundToInt())
-        val outputSamples = outputFrames * 2
-        ensureResampleCapacity(outputSamples)
-        val step = inRate.toDouble() / outRate.toDouble()
-        var position = 0.0
-        for (frame in 0 until outputFrames) {
-            val base = position.toInt().coerceIn(0, inputFrames - 1)
-            val next = (base + 1).coerceAtMost(inputFrames - 1)
-            val frac = position - base
-            val left0 = input[base * 2].toInt()
-            val right0 = input[base * 2 + 1].toInt()
-            val left1 = input[next * 2].toInt()
-            val right1 = input[next * 2 + 1].toInt()
-            resampleBuffer[frame * 2] = (left0 + ((left1 - left0) * frac)).roundToInt().toShort()
-            resampleBuffer[frame * 2 + 1] = (right0 + ((right1 - right0) * frac)).roundToInt().toShort()
-            position += step
-        }
-        return outputSamples
-    }
-
     private companion object {
         private const val AUDIO_READ_CHUNK_SAMPLES = 8192
         private const val DEFAULT_SAMPLE_RATE = 32040
-        private const val DEFAULT_OUTPUT_SAMPLE_RATE = 48000
     }
 }
 
