@@ -247,7 +247,6 @@ class AudioPlayer(
     private val bridge: NativeBridge
 ) {
     private val executor = Executors.newSingleThreadExecutor()
-    private val readBuffer = ShortArray(AUDIO_READ_CHUNK_SAMPLES)
     private var resampleBuffer = ShortArray(0)
     @Volatile private var running = false
     @Volatile private var playbackToken = 0
@@ -278,18 +277,19 @@ class AudioPlayer(
         executor.execute {
             val silenceChunk = ShortArray(4096)
             while (running && playbackToken == token) {
-                val sampleCount = bridge.consumeAudioSamples(readBuffer, readBuffer.size)
+                val sourceSamples = bridge.consumeAudioSamples(AUDIO_READ_CHUNK_SAMPLES)
+                val sampleCount = sourceSamples.size
                 if (sampleCount > 0) {
                     if (sourceSampleRate != outputSampleRate) {
                         val writeLength = resampleStereo(
-                            input = readBuffer,
+                            input = sourceSamples,
                             sampleCount = sampleCount,
                             inRate = sourceSampleRate,
                             outRate = outputSampleRate
                         )
                         track.write(resampleBuffer, 0, writeLength, AudioTrack.WRITE_BLOCKING)
                     } else {
-                        track.write(readBuffer, 0, sampleCount, AudioTrack.WRITE_BLOCKING)
+                        track.write(sourceSamples, 0, sampleCount, AudioTrack.WRITE_BLOCKING)
                     }
                 } else {
                     Thread.sleep(3)
