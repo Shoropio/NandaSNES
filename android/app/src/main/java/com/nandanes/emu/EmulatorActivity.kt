@@ -284,9 +284,9 @@ class EmulatorActivity : ComponentActivity() {
         }
 
         val resolvedRomId = loadResult.romId ?: romId
+        tryLoadLastAutoSaveOnRomStart(resolvedRomId)
         bridge.startEmulation()
         audioPlayer.start()
-        tryLoadLastAutoSaveOnRomStart(resolvedRomId)
         viewModel.onRomLoaded(resolvedRomId, displayLabel, file.absolutePath)
         refreshDebugLog()
     }
@@ -297,7 +297,8 @@ class EmulatorActivity : ComponentActivity() {
         val autoSlot = saveManager.autoSlotPath()
         if (autoSlot.exists()) {
             EmulatorDebug.log("SAVE", "Auto resume from ${autoSlot.absolutePath}")
-            bridge.loadState(autoSlot.absolutePath)
+            val restored = bridge.loadState(autoSlot.absolutePath)
+            EmulatorDebug.log("SAVE", "Auto resume result=$restored snapshot=${bridge.getDebugSnapshot()}")
         }
     }
 
