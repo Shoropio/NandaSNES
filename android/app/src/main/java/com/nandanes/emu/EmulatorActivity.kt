@@ -55,7 +55,9 @@ import com.nandanes.emu.domain.usecase.SaveStateUseCase
 import com.nandanes.emu.runtime.AudioPlayer
 import com.nandanes.emu.runtime.AutoSaveManager
 import com.nandanes.emu.runtime.EmulatorVideoSurface
+import com.nandanes.emu.runtime.NativeEmulationRuntime
 import com.nandanes.emu.runtime.NativeBridge
+import com.nandanes.emu.runtime.NativeSaveStateRuntime
 import com.nandanes.emu.runtime.SaveStateManager
 import com.nandanes.emu.runtime.VibrationController
 import java.io.File
@@ -100,9 +102,11 @@ class EmulatorActivity : ComponentActivity() {
         vibration = VibrationController(this)
         saveManager = SaveStateManager(this)
         autoSaveManager = AutoSaveManager(this, saveManager, bridge)
-        loadRomUseCase = LoadRomUseCase(bridge, saveManager)
-        saveStateUseCase = SaveStateUseCase(bridge, saveManager)
-        loadStateUseCase = LoadStateUseCase(bridge, saveManager)
+        val emulationRuntime = NativeEmulationRuntime(bridge)
+        val saveStateRuntime = NativeSaveStateRuntime(bridge, saveManager)
+        loadRomUseCase = LoadRomUseCase(emulationRuntime, saveStateRuntime)
+        saveStateUseCase = SaveStateUseCase(saveStateRuntime)
+        loadStateUseCase = LoadStateUseCase(emulationRuntime, saveStateRuntime)
         overlaySettingsStore = ControlOverlaySettingsStore(this)
         debugSettingsStore = DebugSettingsStore(this)
         overlaySettings.value = overlaySettingsStore.load()

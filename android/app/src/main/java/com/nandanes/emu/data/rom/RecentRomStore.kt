@@ -4,11 +4,13 @@ import com.nandanes.emu.data.settings.SettingsStoreNames
 import com.nandanes.emu.data.settings.settingsDataStore
 
 import android.content.Context
-import android.net.Uri
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import java.net.URLDecoder
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 data class RecentRom(
     val romId: String,
@@ -17,11 +19,8 @@ data class RecentRom(
     val lastPlayedAt: Long
 )
 
-class RecentRomStore(context: Context) {
-    private val dataStore = settingsDataStore(context, SettingsStoreNames.RECENT_ROMS)
-
-    fun list(): List<RecentRom> {
-        val raw = runBlocking { dataStore.data.first() }[KEY_RECENTS].orEmpty()
+internal object RecentRomCodec {
+    fun decode(raw: String): List<RecentRom> {
         if (raw.isBlank()) return emptyList()
 
         return raw.lineSequence()
@@ -30,15 +29,40 @@ class RecentRomStore(context: Context) {
                 if (parts.size != 4) return@mapNotNull null
                 val lastPlayedAt = parts[3].toLongOrNull() ?: return@mapNotNull null
                 RecentRom(
-                    romId = Uri.decode(parts[0]),
-                    label = Uri.decode(parts[1]),
-                    path = Uri.decode(parts[2]),
+                    romId = decodeValue(parts[0]),
+                    label = decodeValue(parts[1]),
+                    path = decodeValue(parts[2]),
                     lastPlayedAt = lastPlayedAt
                 )
             }
             .filter { it.path.isNotBlank() }
             .sortedByDescending { it.lastPlayedAt }
             .toList()
+    }
+
+    fun encode(recents: List<RecentRom>): String =
+        recents.joinToString(separator = "\n") { recent ->
+            listOf(
+                encodeValue(recent.romId),
+                encodeValue(recent.label),
+                encodeValue(recent.path),
+                recent.lastPlayedAt.toString()
+            ).joinToString(separator = "\t")
+        }
+
+    private fun encodeValue(value: String): String =
+        URLEncoder.encode(value, StandardCharsets.UTF_8.name())
+
+    private fun decodeValue(value: String): String =
+        URLDecoder.decode(value, StandardCharsets.UTF_8.name())
+}
+
+class RecentRomStore(context: Context) {
+    private val dataStore = settingsDataStore(context, SettingsStoreNames.RECENT_ROMS)
+
+    fun list(): List<RecentRom> {
+        val raw = runBlocking { dataStore.data.first() }[KEY_RECENTS].orEmpty()
+        return RecentRomCodec.decode(raw)
     }
 
     fun record(romId: String, label: String, path: String) {
@@ -59,12 +83,12 @@ class RecentRomStore(context: Context) {
             .sortedByDescending { it.lastPlayedAt }
             .take(MAX_RECENTS)
 
-        saveEncoded(encode(updated))
+        saveEncoded(RecentRomCodec.encode(updated))
     }
 
     fun pruneMissingFiles() {
         val filtered = list().filter { java.io.File(it.path).exists() }
-        saveEncoded(encode(filtered))
+        saveEncoded(RecentRomCodec.encode(filtered))
     }
 
     private fun saveEncoded(encoded: String) {
@@ -74,16 +98,6 @@ class RecentRomStore(context: Context) {
             }
         }
     }
-
-    private fun encode(recents: List<RecentRom>): String =
-        recents.joinToString(separator = "\n") { recent ->
-            listOf(
-                Uri.encode(recent.romId),
-                Uri.encode(recent.label),
-                Uri.encode(recent.path),
-                recent.lastPlayedAt.toString()
-            ).joinToString(separator = "\t")
-        }
 
     private companion object {
         private val KEY_RECENTS = stringPreferencesKey("recent_roms")

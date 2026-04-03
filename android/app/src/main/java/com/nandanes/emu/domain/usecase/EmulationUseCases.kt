@@ -1,9 +1,20 @@
 package com.nandanes.emu.domain.usecase
 
 import com.nandanes.emu.data.rom.RomLibraryRepository
-import com.nandanes.emu.runtime.NativeBridge
-import com.nandanes.emu.runtime.SaveStateManager
 import java.io.File
+
+interface EmulationRuntime {
+    fun loadRom(path: String): Boolean
+    fun loadState(path: String): Boolean
+}
+
+interface SaveStateRuntime {
+    fun setActiveRomId(romId: String)
+    fun saveManualState(slot: Int): Boolean
+    fun writeManualThumbnail(slot: Int): Boolean
+    fun manualSlotPath(slot: Int): File
+    fun autoSlotPath(): File
+}
 
 data class LoadRomResult(
     val success: Boolean,
@@ -11,8 +22,8 @@ data class LoadRomResult(
 )
 
 class LoadRomUseCase(
-    private val bridge: NativeBridge,
-    private val saveStateManager: SaveStateManager
+    private val runtime: EmulationRuntime,
+    private val saveStateRuntime: SaveStateRuntime
 ) {
     operator fun invoke(file: File): LoadRomResult {
         if (!file.exists() || !RomLibraryRepository.isSupportedRomName(file.name)) {
@@ -20,8 +31,8 @@ class LoadRomUseCase(
         }
 
         val romId = RomLibraryRepository.romIdFromPath(file)
-        saveStateManager.setActiveRomId(romId)
-        val loaded = bridge.loadRom(file.absolutePath)
+        saveStateRuntime.setActiveRomId(romId)
+        val loaded = runtime.loadRom(file.absolutePath)
         return if (loaded) {
             LoadRomResult(success = true, romId = romId)
         } else {
@@ -31,37 +42,30 @@ class LoadRomUseCase(
 }
 
 class SaveStateUseCase(
-    private val bridge: NativeBridge,
-    private val saveStateManager: SaveStateManager
+    private val saveStateRuntime: SaveStateRuntime
 ) {
     operator fun invoke(romId: String, slot: Int): Boolean {
-        saveStateManager.setActiveRomId(romId)
-        return saveStateManager.saveStateAtomically(
-            bridge,
-            saveStateManager.manualSlotPath(slot)
-        )
+        saveStateRuntime.setActiveRomId(romId)
+        return saveStateRuntime.saveManualState(slot)
     }
 
     fun writeThumbnail(romId: String, slot: Int): Boolean {
-        saveStateManager.setActiveRomId(romId)
-        return saveStateManager.writeCurrentFrameThumbnail(
-            bridge,
-            saveStateManager.manualThumbPath(slot)
-        )
+        saveStateRuntime.setActiveRomId(romId)
+        return saveStateRuntime.writeManualThumbnail(slot)
     }
 }
 
 class LoadStateUseCase(
-    private val bridge: NativeBridge,
-    private val saveStateManager: SaveStateManager
+    private val runtime: EmulationRuntime,
+    private val saveStateRuntime: SaveStateRuntime
 ) {
     fun manualSlot(romId: String, slot: Int): Boolean {
-        saveStateManager.setActiveRomId(romId)
-        return bridge.loadState(saveStateManager.manualSlotPath(slot).absolutePath)
+        saveStateRuntime.setActiveRomId(romId)
+        return runtime.loadState(saveStateRuntime.manualSlotPath(slot).absolutePath)
     }
 
     fun autoSave(romId: String): Boolean {
-        saveStateManager.setActiveRomId(romId)
-        return bridge.loadState(saveStateManager.autoSlotPath().absolutePath)
+        saveStateRuntime.setActiveRomId(romId)
+        return runtime.loadState(saveStateRuntime.autoSlotPath().absolutePath)
     }
 }

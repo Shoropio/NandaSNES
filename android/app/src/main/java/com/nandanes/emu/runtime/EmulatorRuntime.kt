@@ -22,6 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
+import com.nandanes.emu.domain.usecase.EmulationRuntime
+import com.nandanes.emu.domain.usecase.SaveStateRuntime
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -62,6 +64,14 @@ class NativeBridge {
             System.loadLibrary("nandanes")
         }
     }
+}
+
+class NativeEmulationRuntime(
+    private val bridge: NativeBridge
+) : EmulationRuntime {
+    override fun loadRom(path: String): Boolean = bridge.loadRom(path)
+
+    override fun loadState(path: String): Boolean = bridge.loadState(path)
 }
 
 class VibrationController(context: Context) {
@@ -174,6 +184,25 @@ class SaveStateManager(private val context: Context) {
             false
         }
     }
+}
+
+class NativeSaveStateRuntime(
+    private val bridge: NativeBridge,
+    private val saveStateManager: SaveStateManager
+) : SaveStateRuntime {
+    override fun setActiveRomId(romId: String) {
+        saveStateManager.setActiveRomId(romId)
+    }
+
+    override fun saveManualState(slot: Int): Boolean =
+        saveStateManager.saveStateAtomically(bridge, saveStateManager.manualSlotPath(slot))
+
+    override fun writeManualThumbnail(slot: Int): Boolean =
+        saveStateManager.writeCurrentFrameThumbnail(bridge, saveStateManager.manualThumbPath(slot))
+
+    override fun manualSlotPath(slot: Int): File = saveStateManager.manualSlotPath(slot)
+
+    override fun autoSlotPath(): File = saveStateManager.autoSlotPath()
 }
 
 class AutoSaveManager(
