@@ -52,7 +52,7 @@ Important: despite the repository name, the current emulator core is SNES, not N
 Clone the repository with submodules so the native core is available:
 
 ```bash
-git clone --recurse-submodules <your-repo-url>
+git clone --recurse-submodules https://github.com/Shoropio/NandaNes.git
 cd NandaNes
 ```
 
