@@ -841,6 +841,14 @@ Java_com_nandanes_emu_NativeBridge_getLatestFrameInfo(
     return result;
 }
 
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_nandanes_emu_NativeBridge_getVideoFrameCount(
+    JNIEnv *env,
+    jobject /*thiz*/) {
+    (void) env;
+    return static_cast<jlong>(gVideoFrameCount.load());
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_nandanes_emu_NativeBridge_renderLatestFrameToBitmap(
     JNIEnv *env,

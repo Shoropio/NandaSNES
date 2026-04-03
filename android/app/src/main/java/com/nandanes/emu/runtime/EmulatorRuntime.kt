@@ -49,6 +49,7 @@ class NativeBridge {
     external fun loadState(path: String): Boolean
     external fun getFrameArgb8888(): IntArray
     external fun getLatestFrameInfo(): IntArray
+    external fun getVideoFrameCount(): Long
     external fun renderLatestFrameToBitmap(bitmap: Bitmap): Boolean
     external fun consumeAudioSamples(maxSamples: Int): ShortArray
     external fun consumeAudioSamples(buffer: ShortArray, maxSamples: Int): Int
@@ -247,6 +248,7 @@ class AudioPlayer(
 ) {
     private val executor = Executors.newSingleThreadExecutor()
     private val readBuffer = ShortArray(AUDIO_READ_CHUNK_SAMPLES)
+    private var resampleBuffer = ShortArray(0)
     @Volatile private var running = false
     @Volatile private var playbackToken = 0
     private var audioTrack: AudioTrack? = null
@@ -278,13 +280,17 @@ class AudioPlayer(
             while (running && playbackToken == token) {
                 val sampleCount = bridge.consumeAudioSamples(readBuffer, readBuffer.size)
                 if (sampleCount > 0) {
-                    val pcm = if (sourceSampleRate != outputSampleRate) {
-                        resampleStereo(readBuffer, sampleCount, sourceSampleRate, outputSampleRate)
+                    if (sourceSampleRate != outputSampleRate) {
+                        val writeLength = resampleStereo(
+                            input = readBuffer,
+                            sampleCount = sampleCount,
+                            inRate = sourceSampleRate,
+                            outRate = outputSampleRate
+                        )
+                        track.write(resampleBuffer, 0, writeLength, AudioTrack.WRITE_BLOCKING)
                     } else {
-                        readBuffer
+                        track.write(readBuffer, 0, sampleCount, AudioTrack.WRITE_BLOCKING)
                     }
-                    val writeLength = if (sourceSampleRate != outputSampleRate) pcm.size else sampleCount
-                    track.write(pcm, 0, writeLength, AudioTrack.WRITE_BLOCKING)
                 } else {
                     Thread.sleep(3)
                     if (!running || playbackToken != token) break
@@ -365,14 +371,27 @@ class AudioPlayer(
         return value?.toIntOrNull()?.takeIf { it > 0 } ?: DEFAULT_OUTPUT_SAMPLE_RATE
     }
 
-    private fun resampleStereo(input: ShortArray, sampleCount: Int, inRate: Int, outRate: Int): ShortArray {
+    private fun ensureResampleCapacity(requiredSamples: Int) {
+        if (resampleBuffer.size < requiredSamples) {
+            resampleBuffer = ShortArray(requiredSamples)
+        }
+    }
+
+    private fun resampleStereo(input: ShortArray, sampleCount: Int, inRate: Int, outRate: Int): Int {
         if (sampleCount <= 0 || inRate <= 0 || outRate <= 0 || inRate == outRate) {
-            return input.copyOf(sampleCount)
+            ensureResampleCapacity(sampleCount)
+            input.copyInto(resampleBuffer, endIndex = sampleCount)
+            return sampleCount
         }
         val inputFrames = sampleCount / 2
-        if (inputFrames <= 1) return input.copyOf(sampleCount)
+        if (inputFrames <= 1) {
+            ensureResampleCapacity(sampleCount)
+            input.copyInto(resampleBuffer, endIndex = sampleCount)
+            return sampleCount
+        }
         val outputFrames = max(1, ((inputFrames.toDouble() * outRate) / inRate).roundToInt())
-        val output = ShortArray(outputFrames * 2)
+        val outputSamples = outputFrames * 2
+        ensureResampleCapacity(outputSamples)
         val step = inRate.toDouble() / outRate.toDouble()
         var position = 0.0
         for (frame in 0 until outputFrames) {
@@ -383,11 +402,11 @@ class AudioPlayer(
             val right0 = input[base * 2 + 1].toInt()
             val left1 = input[next * 2].toInt()
             val right1 = input[next * 2 + 1].toInt()
-            output[frame * 2] = (left0 + ((left1 - left0) * frac)).roundToInt().toShort()
-            output[frame * 2 + 1] = (right0 + ((right1 - right0) * frac)).roundToInt().toShort()
+            resampleBuffer[frame * 2] = (left0 + ((left1 - left0) * frac)).roundToInt().toShort()
+            resampleBuffer[frame * 2 + 1] = (right0 + ((right1 - right0) * frac)).roundToInt().toShort()
             position += step
         }
-        return output
+        return outputSamples
     }
 
     private companion object {
@@ -410,6 +429,7 @@ private class NativeVideoView(context: Context, private var bridge: NativeBridge
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private var bitmap: Bitmap? = null
     private var lastFrameAtMs: Long = 0L
+    private var lastRenderedFrameCount: Long = -1L
     private var hasLoggedFirstFrame = false
 
     fun bind(nextBridge: NativeBridge) {
@@ -436,7 +456,16 @@ private class NativeVideoView(context: Context, private var bridge: NativeBridge
             val height = meta[1]
             if (width > 0 && height > 0) {
                 ensureBitmap(width, height)
-                val rendered = bitmap?.let { bridge.renderLatestFrameToBitmap(it) } == true
+                val frameCount = bridge.getVideoFrameCount()
+                val rendered = if (frameCount != lastRenderedFrameCount) {
+                    val didRender = bitmap?.let { bridge.renderLatestFrameToBitmap(it) } == true
+                    if (didRender) {
+                        lastRenderedFrameCount = frameCount
+                    }
+                    didRender
+                } else {
+                    bitmap != null
+                }
                 if (rendered) {
                     val target = aspectFitRect(width.toFloat(), height.toFloat(), this.width.toFloat(), this.height.toFloat())
                     bitmap?.let { canvas.drawBitmap(it, null, target, paint) }
@@ -462,6 +491,7 @@ private class NativeVideoView(context: Context, private var bridge: NativeBridge
         if (current != null && current.width == width && current.height == height) return
         current?.recycle()
         bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+        lastRenderedFrameCount = -1L
     }
 
     private fun aspectFitRect(srcWidth: Float, srcHeight: Float, dstWidth: Float, dstHeight: Float): RectF {
