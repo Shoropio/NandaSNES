@@ -1,4 +1,0 @@
-C:/Users/Shoropio/Desktop/NandaNes/android/app/.cxx/Debug/2343q2w2/x86_64/CMakeFiles/snes9xcore.dir
-C:/Users/Shoropio/Desktop/NandaNes/android/app/.cxx/Debug/2343q2w2/x86_64/CMakeFiles/nandanes.dir
-C:/Users/Shoropio/Desktop/NandaNes/android/app/.cxx/Debug/2343q2w2/x86_64/CMakeFiles/edit_cache.dir
-C:/Users/Shoropio/Desktop/NandaNes/android/app/.cxx/Debug/2343q2w2/x86_64/CMakeFiles/rebuild_cache.dir

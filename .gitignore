@@ -1,0 +1,27 @@
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local scratch files
+Nuevo Documento de texto.txt
+
+# Android / IntelliJ generated files
+*.iml
+/android/.gradle/
+/android/.idea/
+/android/.kotlin/
+/android/local.properties
+/android/keystore.properties
+/android/*.jks
+/android/*.keystore
+/android/**/build/
+/android/**/.cxx/
+/android/captures/
+
+# Native and package outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+*.so
