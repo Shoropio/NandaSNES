@@ -259,13 +259,13 @@ class AudioPlayer(
         ensureTrack()
         val track = audioTrack ?: return
         if (track.state != AudioTrack.STATE_INITIALIZED) {
-            EmulatorDebug.log("AUDIO", "AudioTrack not initialized at outputSampleRate=$outputSampleRate")
+            EmulatorDebug.logAlways("AUDIO", "AudioTrack not initialized at outputSampleRate=$outputSampleRate")
             return
         }
         running = true
         val token = ++playbackToken
         val primeTargetSamples = max(sourceSampleRate / 8, 4096)
-        EmulatorDebug.log(
+        EmulatorDebug.logAlways(
             "AUDIO",
             "Playback start sourceRate=$sourceSampleRate outputRate=$outputSampleRate token=$token"
         )
@@ -275,8 +275,13 @@ class AudioPlayer(
             Thread.sleep(8)
         }
         track.play()
+        EmulatorDebug.logAlways(
+            "AUDIO",
+            "AudioTrack playState=${track.playState} pending=${bridge.getPendingAudioSamples()} token=$token"
+        )
         playbackThread = Thread {
             val silenceChunk = ShortArray(4096)
+            var loopCount = 0
             while (running && playbackToken == token) {
                 val sampleCount = bridge.consumeAudioSamples(readBuffer, readBuffer.size)
                 if (sampleCount > 0) {
@@ -287,17 +292,24 @@ class AudioPlayer(
                             inRate = sourceSampleRate,
                             outRate = outputSampleRate
                         )
-                        track.write(resampleBuffer, 0, writeLength, AudioTrack.WRITE_NON_BLOCKING)
+                        writeFully(track, resampleBuffer, writeLength, token)
                     } else {
-                        track.write(readBuffer, 0, sampleCount, AudioTrack.WRITE_NON_BLOCKING)
+                        writeFully(track, readBuffer, sampleCount, token)
                     }
                 } else {
                     Thread.sleep(3)
                     if (!running || playbackToken != token) break
-                    track.write(silenceChunk, 0, silenceChunk.size, AudioTrack.WRITE_NON_BLOCKING)
+                    writeFully(track, silenceChunk, silenceChunk.size, token)
+                }
+                loopCount++
+                if (loopCount % 240 == 0) {
+                    EmulatorDebug.log(
+                        "AUDIO",
+                        "Loop token=$token pending=${bridge.getPendingAudioSamples()} playState=${track.playState}"
+                    )
                 }
             }
-            EmulatorDebug.log("AUDIO", "Playback loop stop token=$token running=$running")
+            EmulatorDebug.logAlways("AUDIO", "Playback loop stop token=$token running=$running")
         }.apply {
             name = "NandaSNES-Audio"
             isDaemon = true
@@ -311,7 +323,7 @@ class AudioPlayer(
         audioTrack?.pause()
         audioTrack?.flush()
         playbackThread = null
-        EmulatorDebug.log("AUDIO", "Playback stop")
+        EmulatorDebug.logAlways("AUDIO", "Playback stop")
     }
 
     fun resetForNextRom() {
@@ -320,7 +332,7 @@ class AudioPlayer(
         audioTrack = null
         sourceSampleRate = 0
         outputSampleRate = 0
-        EmulatorDebug.log("AUDIO", "Audio reset for next ROM")
+        EmulatorDebug.logAlways("AUDIO", "Audio reset for next ROM")
     }
 
     fun release() {
@@ -363,9 +375,10 @@ class AudioPlayer(
             builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
         }
         audioTrack = builder.build()
-        EmulatorDebug.log(
+        audioTrack?.setVolume(1.0f)
+        EmulatorDebug.logAlways(
             "AUDIO",
-            "AudioTrack prepared sourceRate=$sourceSampleRate outputRate=$outputSampleRate bufferSize=$bufferSize"
+            "AudioTrack prepared sourceRate=$sourceSampleRate outputRate=$outputSampleRate bufferSize=$bufferSize minSize=$minSize state=${audioTrack?.state}"
         )
     }
 
@@ -378,6 +391,44 @@ class AudioPlayer(
     private fun ensureResampleCapacity(requiredSamples: Int) {
         if (resampleBuffer.size < requiredSamples) {
             resampleBuffer = ShortArray(requiredSamples)
+        }
+    }
+
+    private fun writeFully(track: AudioTrack, buffer: ShortArray, totalSamples: Int, token: Int) {
+        var offset = 0
+        var idleWrites = 0
+        while (offset < totalSamples && running && playbackToken == token) {
+            val wrote = track.write(
+                buffer,
+                offset,
+                totalSamples - offset,
+                AudioTrack.WRITE_NON_BLOCKING
+            )
+            when {
+                wrote > 0 -> {
+                    offset += wrote
+                    idleWrites = 0
+                }
+                wrote == 0 -> {
+                    idleWrites++
+                    if (idleWrites >= 4) {
+                        Thread.sleep(2)
+                    }
+                    if (idleWrites == 25) {
+                        EmulatorDebug.logAlways(
+                            "AUDIO",
+                            "AudioTrack write stalled token=$token playState=${track.playState} pending=${bridge.getPendingAudioSamples()}"
+                        )
+                    }
+                }
+                else -> {
+                    EmulatorDebug.logAlways(
+                        "AUDIO",
+                        "AudioTrack write error code=$wrote token=$token playState=${track.playState}"
+                    )
+                    return
+                }
+            }
         }
     }
 
