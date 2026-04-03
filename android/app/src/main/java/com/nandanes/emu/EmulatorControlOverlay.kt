@@ -38,11 +38,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nandanes.emu.data.settings.ControlOverlaySettings
@@ -442,42 +446,70 @@ fun DebugPanelContent(
 }
 
 private data class ControlSkinPalette(
+    val shellTop: Color,
+    val shellBottom: Color,
+    val shellEdge: Color,
+    val shellGlow: Color,
     val shoulder: Color,
     val dpad: Color,
     val center: Color,
+    val actionNest: Color,
     val actionX: Color,
     val actionY: Color,
     val actionA: Color,
-    val actionB: Color
+    val actionB: Color,
+    val text: Color,
+    val chrome: Color
 )
 
 private fun paletteForSkin(skin: ControlSkin): ControlSkinPalette = when (skin) {
     ControlSkin.CLASSIC -> ControlSkinPalette(
+        shellTop = Color(0xFF4A4D58),
+        shellBottom = Color(0xFF21242D),
+        shellEdge = Color(0xFF868B97),
+        shellGlow = Color(0xFFF1F2FF),
         shoulder = Color(0xFF494D56),
-        dpad = Color(0xFF69707C),
-        center = Color(0xFF444A57),
-        actionX = Color(0xFF6F90D8),
-        actionY = Color(0xFF6DB2C6),
-        actionA = Color(0xFF63C18F),
-        actionB = Color(0xFFD47373)
+        dpad = Color(0xFF606874),
+        center = Color(0xFF343946),
+        actionNest = Color(0xFF20222B),
+        actionX = Color(0xFF758ACD),
+        actionY = Color(0xFF6D97AA),
+        actionA = Color(0xFF5D9278),
+        actionB = Color(0xFF9D6268),
+        text = Color(0xFFF7F8FC),
+        chrome = Color(0xFFCBD0DB)
     )
     ControlSkin.NEON -> ControlSkinPalette(
+        shellTop = Color(0xFF23445B),
+        shellBottom = Color(0xFF0D1923),
+        shellEdge = Color(0xFF6FD5FF),
+        shellGlow = Color(0xFFB9F8FF),
         shoulder = Color(0xFF28445B),
-        dpad = Color(0xFF00AEEF),
-        center = Color(0xFF21425A),
+        dpad = Color(0xFF1A89AE),
+        center = Color(0xFF173348),
+        actionNest = Color(0xFF111C27),
         actionX = Color(0xFF4FC3F7),
         actionY = Color(0xFF00BCD4),
         actionA = Color(0xFF00E676),
-        actionB = Color(0xFFFF5252)
+        actionB = Color(0xFFFF5252),
+        text = Color(0xFFF5FEFF),
+        chrome = Color(0xFF9FE8FF)
     )
     ControlSkin.CARBON -> ControlSkinPalette(
+        shellTop = Color(0xFF45484D),
+        shellBottom = Color(0xFF17191D),
+        shellEdge = Color(0xFF767A80),
+        shellGlow = Color(0xFFE2E5EA),
         shoulder = Color(0xFF3B3E43),
         dpad = Color(0xFF4C4F55),
         center = Color(0xFF32353A),
+        actionNest = Color(0xFF16181C),
         actionX = Color(0xFF70757F),
         actionY = Color(0xFF7A808A),
         actionA = Color(0xFF959B63),
-        actionB = Color(0xFF9B6666)
+        actionB = Color(0xFF9B6666),
+        text = Color(0xFFF1F2F4),
+        chrome = Color(0xFFC6CBD2)
     )
 }
 
@@ -569,14 +601,14 @@ private fun FloatingMenuButton(
     Button(
         onClick = onClick,
         modifier = modifier,
-        shape = CircleShape,
+        shape = RoundedCornerShape(20.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (active) Color(0xFF5D4FA3) else Color(0x883A3A42),
+            containerColor = if (active) Color(0xCC3E5068) else Color(0x8C181B24),
             contentColor = Color.White
         ),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
     ) {
-        Text("MENU", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Text("MENU", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold)
     }
 }
 
@@ -636,8 +668,10 @@ private fun RetroPillButton(
         onPress = onPress,
         onRelease = onRelease,
         modifier = Modifier.size(width = width, height = height),
-        shape = CutCornerShape(14.dp),
-        background = color.copy(alpha = alpha)
+        shape = RoundedCornerShape(18.dp),
+        background = color.copy(alpha = alpha),
+        chrome = Color.White.copy(alpha = alpha * 0.24f),
+        textColor = Color.White
     )
 }
 
@@ -659,7 +693,9 @@ private fun RetroGhostPillButton(
         modifier = Modifier.size(width = width, height = height),
         shape = RoundedCornerShape(50),
         background = Color(0xCC30343B).copy(alpha = alpha),
-        border = Color(0x77FFFFFF)
+        border = Color(0x77FFFFFF),
+        chrome = Color.White.copy(alpha = alpha * 0.16f),
+        textColor = Color(0xFFF9FBFF)
     )
 }
 
@@ -671,11 +707,27 @@ private fun RetroActionCluster(
     onPress: (SnesKey) -> Unit,
     onRelease: (SnesKey) -> Unit
 ) {
-    Box(modifier = Modifier.size(buttonSize * 2.35f)) {
-        ActionButton("X", SnesKey.X, onPress, onRelease, palette.actionX.copy(alpha = alpha), Modifier.align(Alignment.TopCenter).size(buttonSize))
-        ActionButton("Y", SnesKey.Y, onPress, onRelease, palette.actionY.copy(alpha = alpha), Modifier.align(Alignment.CenterStart).size(buttonSize))
-        ActionButton("A", SnesKey.A, onPress, onRelease, palette.actionA.copy(alpha = alpha), Modifier.align(Alignment.CenterEnd).size(buttonSize))
-        ActionButton("B", SnesKey.B, onPress, onRelease, palette.actionB.copy(alpha = alpha), Modifier.align(Alignment.BottomCenter).size(buttonSize))
+    Box(modifier = Modifier.size(buttonSize * 2.5f)) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(buttonSize * 1.72f)
+                .shadow(18.dp, CircleShape, clip = false)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            palette.actionNest.copy(alpha = alpha * 0.95f),
+                            palette.actionNest.copy(alpha = alpha * 0.68f)
+                        )
+                    )
+                )
+                .border(1.dp, Color.White.copy(alpha = alpha * 0.1f), CircleShape)
+        )
+        ActionButton("X", SnesKey.X, onPress, onRelease, palette.actionX.copy(alpha = alpha), palette, Modifier.align(Alignment.TopCenter).size(buttonSize * 0.94f))
+        ActionButton("Y", SnesKey.Y, onPress, onRelease, palette.actionY.copy(alpha = alpha), palette, Modifier.align(Alignment.CenterStart).size(buttonSize * 0.94f))
+        ActionButton("A", SnesKey.A, onPress, onRelease, palette.actionA.copy(alpha = alpha), palette, Modifier.align(Alignment.CenterEnd).size(buttonSize * 0.94f))
+        ActionButton("B", SnesKey.B, onPress, onRelease, palette.actionB.copy(alpha = alpha), palette, Modifier.align(Alignment.BottomCenter).size(buttonSize * 0.94f))
     }
 }
 
@@ -686,6 +738,7 @@ private fun ActionButton(
     onPress: (SnesKey) -> Unit,
     onRelease: (SnesKey) -> Unit,
     color: Color,
+    palette: ControlSkinPalette,
     modifier: Modifier
 ) {
     TouchButton(
@@ -695,7 +748,10 @@ private fun ActionButton(
         onRelease = onRelease,
         modifier = modifier,
         shape = CircleShape,
-        background = color
+        background = color,
+        border = palette.chrome.copy(alpha = 0.22f),
+        chrome = palette.shellGlow.copy(alpha = 0.18f),
+        textColor = palette.text
     )
 }
 
@@ -708,16 +764,64 @@ private fun RetroDpad(
     onRelease: (SnesKey) -> Unit
 ) {
     Box(modifier = Modifier.size(buttonSize * 3f)) {
-        DpadButton("U", SnesKey.UP, onPress, onRelease, palette.dpad.copy(alpha = alpha), Modifier.align(Alignment.TopCenter).size(buttonSize))
-        DpadButton("L", SnesKey.LEFT, onPress, onRelease, palette.dpad.copy(alpha = alpha), Modifier.align(Alignment.CenterStart).size(buttonSize))
-        DpadButton("R", SnesKey.RIGHT, onPress, onRelease, palette.dpad.copy(alpha = alpha), Modifier.align(Alignment.CenterEnd).size(buttonSize))
-        DpadButton("D", SnesKey.DOWN, onPress, onRelease, palette.dpad.copy(alpha = alpha), Modifier.align(Alignment.BottomCenter).size(buttonSize))
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
-                .size(buttonSize * 0.92f)
-                .clip(RoundedCornerShape(10.dp))
-                .background(palette.center.copy(alpha = alpha * 0.85f))
+                .size(buttonSize * 2.55f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(width = buttonSize * 1.08f, height = buttonSize * 2.7f)
+                    .shadow(20.dp, RoundedCornerShape(20.dp), clip = false)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                palette.shellTop.copy(alpha = alpha),
+                                palette.dpad.copy(alpha = alpha),
+                                palette.shellBottom.copy(alpha = alpha)
+                            )
+                        )
+                    )
+                    .border(1.dp, palette.shellEdge.copy(alpha = alpha * 0.34f), RoundedCornerShape(20.dp))
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(width = buttonSize * 2.7f, height = buttonSize * 1.08f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                palette.shellTop.copy(alpha = alpha),
+                                palette.dpad.copy(alpha = alpha),
+                                palette.shellBottom.copy(alpha = alpha)
+                            )
+                        )
+                    )
+                    .border(1.dp, palette.shellEdge.copy(alpha = alpha * 0.34f), RoundedCornerShape(20.dp))
+            )
+        }
+        DpadButton("^", SnesKey.UP, onPress, onRelease, palette.dpad.copy(alpha = alpha), palette, Modifier.align(Alignment.TopCenter).size(buttonSize * 0.98f))
+        DpadButton("<", SnesKey.LEFT, onPress, onRelease, palette.dpad.copy(alpha = alpha), palette, Modifier.align(Alignment.CenterStart).size(buttonSize * 0.98f))
+        DpadButton(">", SnesKey.RIGHT, onPress, onRelease, palette.dpad.copy(alpha = alpha), palette, Modifier.align(Alignment.CenterEnd).size(buttonSize * 0.98f))
+        DpadButton("v", SnesKey.DOWN, onPress, onRelease, palette.dpad.copy(alpha = alpha), palette, Modifier.align(Alignment.BottomCenter).size(buttonSize * 0.98f))
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(buttonSize * 0.84f)
+                .shadow(12.dp, RoundedCornerShape(14.dp), clip = false)
+                .clip(RoundedCornerShape(14.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            palette.center.copy(alpha = alpha),
+                            palette.shellBottom.copy(alpha = alpha * 0.95f)
+                        )
+                    )
+                )
+                .border(1.dp, palette.shellGlow.copy(alpha = alpha * 0.16f), RoundedCornerShape(14.dp))
         )
     }
 }
@@ -729,6 +833,7 @@ private fun DpadButton(
     onPress: (SnesKey) -> Unit,
     onRelease: (SnesKey) -> Unit,
     color: Color,
+    palette: ControlSkinPalette,
     modifier: Modifier
 ) {
     TouchButton(
@@ -738,7 +843,10 @@ private fun DpadButton(
         onRelease = onRelease,
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        background = color
+        background = color,
+        border = palette.chrome.copy(alpha = 0.18f),
+        chrome = palette.shellGlow.copy(alpha = 0.14f),
+        textColor = palette.text
     )
 }
 
@@ -750,16 +858,30 @@ private fun TouchButton(
     onPress: (SnesKey) -> Unit,
     onRelease: (SnesKey) -> Unit,
     modifier: Modifier,
-    shape: androidx.compose.ui.graphics.Shape,
+    shape: Shape,
     background: Color,
-    border: Color = Color.Transparent
+    border: Color = Color.Transparent,
+    chrome: Color = Color.White.copy(alpha = 0.14f),
+    textColor: Color = Color.White
 ) {
     var pressed by remember { mutableStateOf(false) }
+    val outerBorder = if (border == Color.Transparent) background.highlight(0.14f) else border
+    val surfaceBrush = Brush.verticalGradient(
+        listOf(
+            background.highlight(0.26f),
+            background,
+            background.shade(0.28f)
+        )
+    )
     Box(
         modifier = modifier
+            .shadow(if (pressed) 8.dp else 16.dp, shape, clip = false)
             .clip(shape)
-            .background(if (pressed) background.copy(alpha = 0.9f) else background, shape)
-            .border(1.dp, border, shape)
+            .background(surfaceBrush, shape)
+            .border(1.dp, outerBorder, shape)
+            .background(Color.Transparent)
+            .border(1.dp, Color.Black.copy(alpha = 0.16f), shape)
+            .clip(shape)
             .pointerInteropFilter { event ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN,
@@ -782,11 +904,31 @@ private fun TouchButton(
             },
         contentAlignment = Alignment.Center
     ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(2.dp)
+                .clip(shape)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            chrome,
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.12f)
+                        )
+                    )
+                )
+        )
         Text(
             text = label,
-            color = Color.White,
+            color = textColor,
             fontWeight = FontWeight.Black,
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center
         )
     }
 }
+
+private fun Color.highlight(amount: Float): Color = lerp(this, Color.White, amount.coerceIn(0f, 1f))
+
+private fun Color.shade(amount: Float): Color = lerp(this, Color.Black, amount.coerceIn(0f, 1f))
