@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,7 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
@@ -38,16 +37,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import com.nandanes.emu.data.settings.ControlOverlaySettings
 import com.nandanes.emu.data.settings.ControlSkin
@@ -84,13 +87,32 @@ fun EmulatorOverlay(
     val showControls = !showingSaves
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val sw = this.maxWidth
+        val sh = this.maxHeight
         val compactScale = 0.92f
         val actionBase = 66.dp * settings.sizeScale * compactScale
         val dpadBase = 60.dp * settings.sizeScale * compactScale
         val centerButtonWidth = 88.dp * settings.sizeScale * compactScale
         val centerButtonHeight = 38.dp * settings.sizeScale * compactScale
-        val shoulderWidth = 78.dp * settings.sizeScale * compactScale
-        val shoulderHeight = 32.dp * settings.sizeScale * compactScale
+        val shoulderWidth = 98.dp * settings.sizeScale * compactScale
+        val shoulderHeight = 40.dp * settings.sizeScale * compactScale
+        val dpadClusterSize = dpadBase * 2.3f
+        val actionClusterSize = actionBase * 2.4f
+        val menuWidth = 112.dp
+        val menuHeight = 52.dp
+        val leftShoulderAnchor = proportionalAnchor(sw, sh, 0.14f, 0.15f, shoulderWidth, shoulderHeight)
+        val rightShoulderAnchor = proportionalAnchor(sw, sh, 0.86f, 0.15f, shoulderWidth, shoulderHeight)
+        val dpadAnchor = proportionalAnchor(sw, sh, 0.18f, 0.62f, dpadClusterSize, dpadClusterSize)
+        val actionAnchor = proportionalAnchor(sw, sh, 0.82f, 0.62f, actionClusterSize, actionClusterSize)
+        val centerAnchor = proportionalAnchor(
+            sw,
+            sh,
+            0.5f,
+            0.88f,
+            centerButtonWidth * 2f + 18.dp,
+            centerButtonHeight
+        )
+        val menuAnchor = proportionalAnchor(sw, sh, 0.5f, 0.15f, menuWidth, menuHeight)
         val dpadAlpha = (settings.opacity * settings.dpadOpacity).coerceIn(0.06f, 0.98f)
         val actionAlpha = (settings.opacity * settings.actionOpacity).coerceIn(0.06f, 1f)
         val centerAlpha = (settings.opacity * settings.centerOpacity).coerceIn(0.06f, 0.98f)
@@ -114,8 +136,7 @@ fun EmulatorOverlay(
 
         FloatingMenuButton(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 14.dp),
+                .offset(x = menuAnchor.x, y = menuAnchor.y),
             active = panelMode != OverlayPanelMode.NONE,
             onClick = {
                 panelMode = if (panelMode == OverlayPanelMode.NONE) {
@@ -130,37 +151,40 @@ fun EmulatorOverlay(
             DraggableControlLayer(
                 enabled = editing,
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .offset(y = settings.shoulderOffsetY.dp)
-                    .padding(start = 18.dp, top = 44.dp),
+                    .offset(
+                        x = leftShoulderAnchor.x,
+                        y = leftShoulderAnchor.y + settings.shoulderOffsetY.dp
+                    ),
                 onDrag = { _, dy ->
                     onSettingsChange(settings.copy(shoulderOffsetY = (settings.shoulderOffsetY + dy).coerceIn(-24f, 70f)))
                 },
                 editorLabel = "L"
             ) {
-                RetroPillButton("L", SnesKey.L, onPress, onRelease, shoulderWidth, shoulderHeight, palette.shoulder, shoulderAlpha)
+                RetroShoulderButton("L", SnesKey.L, onPress, onRelease, shoulderWidth, shoulderHeight, shoulderAlpha, palette, mirrored = false)
             }
 
             DraggableControlLayer(
                 enabled = editing,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(y = settings.shoulderOffsetY.dp)
-                    .padding(end = 18.dp, top = 44.dp),
+                    .offset(
+                        x = rightShoulderAnchor.x,
+                        y = rightShoulderAnchor.y + settings.shoulderOffsetY.dp
+                    ),
                 onDrag = { _, dy ->
                     onSettingsChange(settings.copy(shoulderOffsetY = (settings.shoulderOffsetY + dy).coerceIn(-24f, 70f)))
                 },
                 editorLabel = "R"
             ) {
-                RetroPillButton("R", SnesKey.R, onPress, onRelease, shoulderWidth, shoulderHeight, palette.shoulder, shoulderAlpha)
+                RetroShoulderButton("R", SnesKey.R, onPress, onRelease, shoulderWidth, shoulderHeight, shoulderAlpha, palette, mirrored = true)
             }
 
             DraggableControlLayer(
                 enabled = editing,
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .offset(x = settings.dpadOffsetX.dp, y = settings.dpadOffsetY.dp)
-                    .padding(start = 14.dp, bottom = 20.dp),
+                    .offset(
+                        x = dpadAnchor.x + settings.dpadOffsetX.dp,
+                        y = dpadAnchor.y + settings.dpadOffsetY.dp
+                    ),
                 onDrag = { dx, dy ->
                     onSettingsChange(
                         settings.copy(
@@ -177,9 +201,10 @@ fun EmulatorOverlay(
             DraggableControlLayer(
                 enabled = editing,
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .offset(x = settings.actionOffsetX.dp, y = settings.actionOffsetY.dp)
-                    .padding(end = 14.dp, bottom = 20.dp),
+                    .offset(
+                        x = actionAnchor.x + settings.actionOffsetX.dp,
+                        y = actionAnchor.y + settings.actionOffsetY.dp
+                    ),
                 onDrag = { dx, dy ->
                     onSettingsChange(
                         settings.copy(
@@ -196,9 +221,10 @@ fun EmulatorOverlay(
             DraggableControlLayer(
                 enabled = editing,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset(y = settings.centerOffsetY.dp)
-                    .padding(bottom = 16.dp),
+                    .offset(
+                        x = centerAnchor.x,
+                        y = centerAnchor.y + settings.centerOffsetY.dp
+                    ),
                 onDrag = { _, dy ->
                     onSettingsChange(settings.copy(centerOffsetY = (settings.centerOffsetY + dy).coerceIn(-120f, 24f)))
                 },
@@ -225,7 +251,7 @@ fun EmulatorOverlay(
                 OverlayBottomSheet(
                     modifier = Modifier.align(Alignment.BottomCenter),
                     title = romLabel,
-                    subtitle = "Elige una accion sin tapar la partida",
+                    subtitle = "Elige una acción sin tapar la partida",
                     onDismiss = { panelMode = OverlayPanelMode.NONE }
                 ) {
                     Row(
@@ -446,70 +472,34 @@ fun DebugPanelContent(
 }
 
 private data class ControlSkinPalette(
-    val shellTop: Color,
-    val shellBottom: Color,
-    val shellEdge: Color,
-    val shellGlow: Color,
-    val shoulder: Color,
-    val dpad: Color,
-    val center: Color,
-    val actionNest: Color,
-    val actionX: Color,
-    val actionY: Color,
-    val actionA: Color,
-    val actionB: Color,
-    val text: Color,
-    val chrome: Color
+    val outline: Color,
+    val fill: Color,
+    val fillPressed: Color,
+    val accent: Color,
+    val text: Color
 )
 
 private fun paletteForSkin(skin: ControlSkin): ControlSkinPalette = when (skin) {
     ControlSkin.CLASSIC -> ControlSkinPalette(
-        shellTop = Color(0xFF4A4D58),
-        shellBottom = Color(0xFF21242D),
-        shellEdge = Color(0xFF868B97),
-        shellGlow = Color(0xFFF1F2FF),
-        shoulder = Color(0xFF494D56),
-        dpad = Color(0xFF606874),
-        center = Color(0xFF343946),
-        actionNest = Color(0xFF20222B),
-        actionX = Color(0xFF758ACD),
-        actionY = Color(0xFF6D97AA),
-        actionA = Color(0xFF5D9278),
-        actionB = Color(0xFF9D6268),
-        text = Color(0xFFF7F8FC),
-        chrome = Color(0xFFCBD0DB)
+        outline = Color(0xD9FFFFFF),
+        fill = Color(0x14000000),
+        fillPressed = Color(0x26FFFFFF),
+        accent = Color(0x80FFFFFF),
+        text = Color(0xF2FFFFFF)
     )
     ControlSkin.NEON -> ControlSkinPalette(
-        shellTop = Color(0xFF23445B),
-        shellBottom = Color(0xFF0D1923),
-        shellEdge = Color(0xFF6FD5FF),
-        shellGlow = Color(0xFFB9F8FF),
-        shoulder = Color(0xFF28445B),
-        dpad = Color(0xFF1A89AE),
-        center = Color(0xFF173348),
-        actionNest = Color(0xFF111C27),
-        actionX = Color(0xFF4FC3F7),
-        actionY = Color(0xFF00BCD4),
-        actionA = Color(0xFF00E676),
-        actionB = Color(0xFFFF5252),
-        text = Color(0xFFF5FEFF),
-        chrome = Color(0xFF9FE8FF)
+        outline = Color(0xCCB8F6FF),
+        fill = Color(0x14003E52),
+        fillPressed = Color(0x2455E8FF),
+        accent = Color(0x994CEBFF),
+        text = Color(0xFFF3FEFF)
     )
     ControlSkin.CARBON -> ControlSkinPalette(
-        shellTop = Color(0xFF45484D),
-        shellBottom = Color(0xFF17191D),
-        shellEdge = Color(0xFF767A80),
-        shellGlow = Color(0xFFE2E5EA),
-        shoulder = Color(0xFF3B3E43),
-        dpad = Color(0xFF4C4F55),
-        center = Color(0xFF32353A),
-        actionNest = Color(0xFF16181C),
-        actionX = Color(0xFF70757F),
-        actionY = Color(0xFF7A808A),
-        actionA = Color(0xFF959B63),
-        actionB = Color(0xFF9B6666),
-        text = Color(0xFFF1F2F4),
-        chrome = Color(0xFFC6CBD2)
+        outline = Color(0xCCECECEC),
+        fill = Color(0x12000000),
+        fillPressed = Color(0x1FFFFFFF),
+        accent = Color(0x8ACFCFCF),
+        text = Color(0xFFF6F6F6)
     )
 }
 
@@ -601,14 +591,15 @@ private fun FloatingMenuButton(
     Button(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(1.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (active) Color(0xCC3E5068) else Color(0x8C181B24),
+            containerColor = if (active) Color(0x1FFFFFFF) else Color(0x14000000),
             contentColor = Color.White
         ),
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = if (active) 0.9f else 0.55f)),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Text("MENU", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold)
+        Text("MENU", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -652,15 +643,16 @@ private fun DraggableControlLayer(
 }
 
 @Composable
-private fun RetroPillButton(
+private fun RetroShoulderButton(
     label: String,
     key: SnesKey,
     onPress: (SnesKey) -> Unit,
     onRelease: (SnesKey) -> Unit,
     width: Dp,
     height: Dp,
-    color: Color,
-    alpha: Float
+    alpha: Float,
+    palette: ControlSkinPalette,
+    mirrored: Boolean
 ) {
     TouchButton(
         label = label,
@@ -668,10 +660,12 @@ private fun RetroPillButton(
         onPress = onPress,
         onRelease = onRelease,
         modifier = Modifier.size(width = width, height = height),
-        shape = RoundedCornerShape(18.dp),
-        background = color.copy(alpha = alpha),
-        chrome = Color.White.copy(alpha = alpha * 0.24f),
-        textColor = Color.White
+        shape = shoulderShape(mirrored),
+        background = palette.fill.copy(alpha = alpha),
+        border = palette.outline.copy(alpha = alpha),
+        chrome = palette.fillPressed.copy(alpha = alpha),
+        textColor = palette.text,
+        textStyle = MaterialTheme.typography.titleMedium
     )
 }
 
@@ -691,11 +685,12 @@ private fun RetroGhostPillButton(
         onPress = onPress,
         onRelease = onRelease,
         modifier = Modifier.size(width = width, height = height),
-        shape = RoundedCornerShape(50),
-        background = Color(0xCC30343B).copy(alpha = alpha),
-        border = Color(0x77FFFFFF),
-        chrome = Color.White.copy(alpha = alpha * 0.16f),
-        textColor = Color(0xFFF9FBFF)
+        shape = RoundedCornerShape(1.dp),
+        background = Color.Transparent,
+        border = Color.White.copy(alpha = alpha),
+        chrome = Color.White.copy(alpha = alpha * 0.14f),
+        textColor = Color.White,
+        textStyle = MaterialTheme.typography.labelLarge
     )
 }
 
@@ -707,27 +702,11 @@ private fun RetroActionCluster(
     onPress: (SnesKey) -> Unit,
     onRelease: (SnesKey) -> Unit
 ) {
-    Box(modifier = Modifier.size(buttonSize * 2.5f)) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(buttonSize * 1.72f)
-                .shadow(18.dp, CircleShape, clip = false)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            palette.actionNest.copy(alpha = alpha * 0.95f),
-                            palette.actionNest.copy(alpha = alpha * 0.68f)
-                        )
-                    )
-                )
-                .border(1.dp, Color.White.copy(alpha = alpha * 0.1f), CircleShape)
-        )
-        ActionButton("X", SnesKey.X, onPress, onRelease, palette.actionX.copy(alpha = alpha), palette, Modifier.align(Alignment.TopCenter).size(buttonSize * 0.94f))
-        ActionButton("Y", SnesKey.Y, onPress, onRelease, palette.actionY.copy(alpha = alpha), palette, Modifier.align(Alignment.CenterStart).size(buttonSize * 0.94f))
-        ActionButton("A", SnesKey.A, onPress, onRelease, palette.actionA.copy(alpha = alpha), palette, Modifier.align(Alignment.CenterEnd).size(buttonSize * 0.94f))
-        ActionButton("B", SnesKey.B, onPress, onRelease, palette.actionB.copy(alpha = alpha), palette, Modifier.align(Alignment.BottomCenter).size(buttonSize * 0.94f))
+    Box(modifier = Modifier.size(buttonSize * 2.8f)) {
+        ActionButton("X", SnesKey.X, onPress, onRelease, palette, alpha, Modifier.align(Alignment.TopCenter).size(buttonSize))
+        ActionButton("Y", SnesKey.Y, onPress, onRelease, palette, alpha, Modifier.align(Alignment.CenterStart).size(buttonSize))
+        ActionButton("A", SnesKey.A, onPress, onRelease, palette, alpha, Modifier.align(Alignment.CenterEnd).size(buttonSize))
+        ActionButton("B", SnesKey.B, onPress, onRelease, palette, alpha, Modifier.align(Alignment.BottomCenter).size(buttonSize))
     }
 }
 
@@ -737,8 +716,8 @@ private fun ActionButton(
     key: SnesKey,
     onPress: (SnesKey) -> Unit,
     onRelease: (SnesKey) -> Unit,
-    color: Color,
     palette: ControlSkinPalette,
+    alpha: Float,
     modifier: Modifier
 ) {
     TouchButton(
@@ -748,10 +727,11 @@ private fun ActionButton(
         onRelease = onRelease,
         modifier = modifier,
         shape = CircleShape,
-        background = color,
-        border = palette.chrome.copy(alpha = 0.22f),
-        chrome = palette.shellGlow.copy(alpha = 0.18f),
-        textColor = palette.text
+        background = palette.fill.copy(alpha = alpha),
+        border = palette.outline.copy(alpha = alpha),
+        chrome = palette.fillPressed.copy(alpha = alpha),
+        textColor = palette.text,
+        textStyle = MaterialTheme.typography.headlineSmall
     )
 }
 
@@ -763,90 +743,54 @@ private fun RetroDpad(
     onPress: (SnesKey) -> Unit,
     onRelease: (SnesKey) -> Unit
 ) {
-    Box(modifier = Modifier.size(buttonSize * 3f)) {
+    val totalSize = buttonSize * 2.8f // Proporción perfecta para que los brazos toquen el centro
+    Box(modifier = Modifier.size(totalSize)) {
+        // Bloque central que une la cruceta
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
-                .size(buttonSize * 2.55f)
-        ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(width = buttonSize * 1.08f, height = buttonSize * 2.7f)
-                    .shadow(20.dp, RoundedCornerShape(20.dp), clip = false)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                palette.shellTop.copy(alpha = alpha),
-                                palette.dpad.copy(alpha = alpha),
-                                palette.shellBottom.copy(alpha = alpha)
-                            )
-                        )
-                    )
-                    .border(1.dp, palette.shellEdge.copy(alpha = alpha * 0.34f), RoundedCornerShape(20.dp))
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(width = buttonSize * 2.7f, height = buttonSize * 1.08f)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                palette.shellTop.copy(alpha = alpha),
-                                palette.dpad.copy(alpha = alpha),
-                                palette.shellBottom.copy(alpha = alpha)
-                            )
-                        )
-                    )
-                    .border(1.dp, palette.shellEdge.copy(alpha = alpha * 0.34f), RoundedCornerShape(20.dp))
-            )
-        }
-        DpadButton("^", SnesKey.UP, onPress, onRelease, palette.dpad.copy(alpha = alpha), palette, Modifier.align(Alignment.TopCenter).size(buttonSize * 0.98f))
-        DpadButton("<", SnesKey.LEFT, onPress, onRelease, palette.dpad.copy(alpha = alpha), palette, Modifier.align(Alignment.CenterStart).size(buttonSize * 0.98f))
-        DpadButton(">", SnesKey.RIGHT, onPress, onRelease, palette.dpad.copy(alpha = alpha), palette, Modifier.align(Alignment.CenterEnd).size(buttonSize * 0.98f))
-        DpadButton("v", SnesKey.DOWN, onPress, onRelease, palette.dpad.copy(alpha = alpha), palette, Modifier.align(Alignment.BottomCenter).size(buttonSize * 0.98f))
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(buttonSize * 0.84f)
-                .shadow(12.dp, RoundedCornerShape(14.dp), clip = false)
-                .clip(RoundedCornerShape(14.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            palette.center.copy(alpha = alpha),
-                            palette.shellBottom.copy(alpha = alpha * 0.95f)
-                        )
-                    )
-                )
-                .border(1.dp, palette.shellGlow.copy(alpha = alpha * 0.16f), RoundedCornerShape(14.dp))
+                .size(buttonSize * 0.8f)
+                .background(palette.fill.copy(alpha = alpha))
         )
+        // Botones con bordes redondeados solo en las puntas exteriores
+        DpadButton(DirectionGlyph.UP, SnesKey.UP, onPress, onRelease, palette, alpha, Modifier.align(Alignment.TopCenter).size(buttonSize))
+        DpadButton(DirectionGlyph.LEFT, SnesKey.LEFT, onPress, onRelease, palette, alpha, Modifier.align(Alignment.CenterStart).size(buttonSize))
+        DpadButton(DirectionGlyph.RIGHT, SnesKey.RIGHT, onPress, onRelease, palette, alpha, Modifier.align(Alignment.CenterEnd).size(buttonSize))
+        DpadButton(DirectionGlyph.DOWN, SnesKey.DOWN, onPress, onRelease, palette, alpha, Modifier.align(Alignment.BottomCenter).size(buttonSize))
     }
 }
 
+private fun dpadShape(glyph: DirectionGlyph): Shape = when (glyph) {
+    DirectionGlyph.UP -> RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+    DirectionGlyph.DOWN -> RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp)
+    DirectionGlyph.LEFT -> RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp)
+    DirectionGlyph.RIGHT -> RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)
+}
+
+private enum class DirectionGlyph { UP, LEFT, RIGHT, DOWN }
+
 @Composable
 private fun DpadButton(
-    label: String,
+    glyph: DirectionGlyph,
     key: SnesKey,
     onPress: (SnesKey) -> Unit,
     onRelease: (SnesKey) -> Unit,
-    color: Color,
     palette: ControlSkinPalette,
+    alpha: Float,
     modifier: Modifier
 ) {
     TouchButton(
-        label = label,
+        label = "",
         key = key,
         onPress = onPress,
         onRelease = onRelease,
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        background = color,
-        border = palette.chrome.copy(alpha = 0.18f),
-        chrome = palette.shellGlow.copy(alpha = 0.14f),
-        textColor = palette.text
+        shape = dpadShape(glyph),
+        background = palette.fill.copy(alpha = alpha),
+        border = palette.outline.copy(alpha = alpha),
+        chrome = palette.fillPressed.copy(alpha = alpha),
+        textColor = palette.text,
+        overlayContent = { DirectionIcon(glyph, palette.text.copy(alpha = alpha)) }
     )
 }
 
@@ -862,26 +806,16 @@ private fun TouchButton(
     background: Color,
     border: Color = Color.Transparent,
     chrome: Color = Color.White.copy(alpha = 0.14f),
-    textColor: Color = Color.White
+    textColor: Color = Color.White,
+    textStyle: TextStyle = MaterialTheme.typography.titleMedium,
+    overlayContent: @Composable (() -> Unit)? = null
 ) {
     var pressed by remember { mutableStateOf(false) }
-    val outerBorder = if (border == Color.Transparent) background.highlight(0.14f) else border
-    val surfaceBrush = Brush.verticalGradient(
-        listOf(
-            background.highlight(0.26f),
-            background,
-            background.shade(0.28f)
-        )
-    )
     Box(
         modifier = modifier
-            .shadow(if (pressed) 8.dp else 16.dp, shape, clip = false)
             .clip(shape)
-            .background(surfaceBrush, shape)
-            .border(1.dp, outerBorder, shape)
-            .background(Color.Transparent)
-            .border(1.dp, Color.Black.copy(alpha = 0.16f), shape)
-            .clip(shape)
+            .background(if (pressed) chrome else background, shape)
+            .border(1.dp, border, shape)
             .pointerInteropFilter { event ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN,
@@ -904,31 +838,80 @@ private fun TouchButton(
             },
         contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .padding(2.dp)
-                .clip(shape)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            chrome,
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.12f)
-                        )
-                    )
-                )
-        )
-        Text(
-            text = label,
-            color = textColor,
-            fontWeight = FontWeight.Black,
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center
-        )
+        if (overlayContent != null) {
+            overlayContent()
+        } else {
+            Text(
+                text = label,
+                color = textColor,
+                fontWeight = FontWeight.Medium,
+                style = textStyle,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
-private fun Color.highlight(amount: Float): Color = lerp(this, Color.White, amount.coerceIn(0f, 1f))
+private fun shoulderShape(mirrored: Boolean): Shape = GenericShape { size, _ ->
+    if (!mirrored) {
+        moveTo(0f, size.height)
+        cubicTo(0f, size.height * 0.36f, size.width * 0.08f, 0f, size.width * 0.2f, 0f)
+        lineTo(size.width, 0f)
+        lineTo(size.width, size.height)
+    } else {
+        moveTo(0f, 0f)
+        lineTo(size.width * 0.8f, 0f)
+        cubicTo(size.width * 0.92f, 0f, size.width, size.height * 0.36f, size.width, size.height)
+        lineTo(0f, size.height)
+    }
+    close()
+}
 
-private fun Color.shade(amount: Float): Color = lerp(this, Color.Black, amount.coerceIn(0f, 1f))
+private data class ProportionalAnchor(val x: Dp, val y: Dp)
+
+private fun proportionalAnchor(
+    screenWidth: Dp,
+    screenHeight: Dp,
+    xRatio: Float,
+    yRatio: Float,
+    elementWidth: Dp,
+    elementHeight: Dp
+): ProportionalAnchor {
+    val x = (screenWidth * xRatio) - (elementWidth / 2f)
+    val y = (screenHeight * yRatio) - (elementHeight / 2f)
+    return ProportionalAnchor(
+        x = x.coerceAtLeast(0.dp),
+        y = y.coerceAtLeast(0.dp)
+    )
+}
+
+@Composable
+private fun DirectionIcon(
+    glyph: DirectionGlyph,
+    color: Color
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .drawBehind {
+                val arrowSize = size.minDimension * 0.22f
+                rotate(
+                    degrees = when (glyph) {
+                        DirectionGlyph.UP -> 0f
+                        DirectionGlyph.RIGHT -> 90f
+                        DirectionGlyph.DOWN -> 180f
+                        DirectionGlyph.LEFT -> 270f
+                    },
+                    pivot = center
+                ) {
+                    val path = Path().apply {
+                        moveTo(center.x, center.y - arrowSize)
+                        lineTo(center.x - arrowSize * 0.85f, center.y + arrowSize * 0.65f)
+                        lineTo(center.x + arrowSize * 0.85f, center.y + arrowSize * 0.65f)
+                        close()
+                    }
+                    drawPath(path, color, style = Stroke(width = 1.5.dp.toPx()))
+                }
+            }
+    )
+}

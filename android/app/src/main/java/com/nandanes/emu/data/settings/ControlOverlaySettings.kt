@@ -16,11 +16,11 @@ data class ControlOverlaySettings(
     val actionOpacity: Float = 0.8f,
     val centerOpacity: Float = 0.7f,
     val shoulderOpacity: Float = 0.68f,
-    val dpadOffsetX: Float = 10f,
-    val dpadOffsetY: Float = -12f,
-    val actionOffsetX: Float = -10f,
-    val actionOffsetY: Float = -14f,
-    val centerOffsetY: Float = -18f,
+    val dpadOffsetX: Float = 0f,
+    val dpadOffsetY: Float = 0f,
+    val actionOffsetX: Float = 0f,
+    val actionOffsetY: Float = 0f,
+    val centerOffsetY: Float = 0f,
     val shoulderOffsetY: Float = 0f,
     val hapticsEnabled: Boolean = true,
     val hapticsStrength: Float = 0.65f,
@@ -90,7 +90,7 @@ class ControlOverlaySettingsStore(context: Context) {
     }
 
     companion object {
-        private const val LAYOUT_VERSION = 3
+        private const val LAYOUT_VERSION = 4
         private val KEY_LAYOUT_VERSION = intPreferencesKey("layout_version")
         private val KEY_SIZE_SCALE = floatPreferencesKey("size_scale")
         private val KEY_OPACITY = floatPreferencesKey("opacity")
