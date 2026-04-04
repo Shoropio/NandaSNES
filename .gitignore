@@ -3,9 +3,6 @@
 Thumbs.db
 Desktop.ini
 
-# Local scratch files
-Nuevo Documento de texto.txt
-
 # Android / IntelliJ generated files
 *.iml
 /android/.gradle/

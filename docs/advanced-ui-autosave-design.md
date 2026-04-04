@@ -115,6 +115,5 @@ sequenceDiagram
     A->>A: onStop() (opcional segundo trigger con debounce)
 ```
 
-## Archivos de ejemplo incluidos
-- Kotlin: `android-samples/kotlin/EmulatorControlsAndSave.kt`
-- JNI C++: `android-samples/cpp/nandanes_jni_bridge.cpp`
+## Referencia del repositorio
+- GitHub: `https://github.com/Shoropio/NandaSNES`

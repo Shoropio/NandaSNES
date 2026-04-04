@@ -12,20 +12,28 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -43,6 +51,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.io.File
@@ -59,6 +68,7 @@ fun SaveSlotsPanel(
     onClose: () -> Unit,
     onSave: (Int) -> Unit,
     onLoad: (Int) -> Unit,
+    onDelete: (Int) -> Unit,
     onLoadAutoSave: () -> Unit,
     onDeleteAutoSave: () -> Unit
 ) {
@@ -107,7 +117,13 @@ fun SaveSlotsPanel(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
-            SquareActionButton(onClick = onClose, accent = Color(0x663A3A42), label = "X")
+            SquareActionButton(
+                onClick = onClose,
+                modifier = Modifier.size(48.dp),
+                accent = Color(0x663A3A42),
+                icon = Icons.Outlined.Close,
+                contentDescription = "Cerrar panel"
+            )
             Spacer(modifier = Modifier.width(8.dp))
             Switch(
                 checked = autoResumeEnabled,
@@ -143,22 +159,22 @@ fun SaveSlotsPanel(
                         title = "Auto",
                         subtitle = autoText,
                         bitmap = autoBmp,
-                        primary = {
+                        actions = {
                             SquareActionButton(
                                 onClick = onLoadAutoSave,
-                                enabled = autoFileExists && !isBusy,
-                                modifier = Modifier.weight(1f),
                                 accent = Color(0xFF2B3D5C),
-                                label = "L"
+                                enabled = autoFileExists && !isBusy,
+                                icon = Icons.Outlined.Download,
+                                contentDescription = "Cargar auto-guardado",
+                                modifier = Modifier.weight(1f)
                             )
-                        },
-                        secondary = {
                             SquareActionButton(
                                 onClick = onDeleteAutoSave,
-                                enabled = autoFileExists && !isBusy,
-                                modifier = Modifier.weight(1f),
                                 accent = Color(0xFF4A2727),
-                                label = "X"
+                                enabled = autoFileExists && !isBusy,
+                                icon = Icons.Outlined.Delete,
+                                contentDescription = "Borrar auto-guardado",
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     )
@@ -178,21 +194,29 @@ fun SaveSlotsPanel(
                         title = "Slot $slot",
                         subtitle = text,
                         bitmap = bmp,
-                        primary = {
+                        actions = {
                             SquareActionButton(
                                 onClick = { onSave(slot) },
                                 enabled = !isBusy,
-                                modifier = Modifier.weight(1f),
-                                label = "S"
+                                icon = Icons.Outlined.Save,
+                                contentDescription = "Guardar slot $slot",
+                                modifier = Modifier.weight(1f)
                             )
-                        },
-                        secondary = {
                             SquareActionButton(
                                 onClick = { onLoad(slot) },
                                 enabled = stateFile.exists() && !isBusy,
-                                modifier = Modifier.weight(1f),
                                 accent = Color(0xFF2B3D5C),
-                                label = "L"
+                                icon = Icons.Outlined.Download,
+                                contentDescription = "Cargar slot $slot",
+                                modifier = Modifier.weight(1f)
+                            )
+                            SquareActionButton(
+                                onClick = { onDelete(slot) },
+                                enabled = stateFile.exists() && !isBusy,
+                                accent = Color(0xFF4A2727),
+                                icon = Icons.Outlined.Delete,
+                                contentDescription = "Borrar slot $slot",
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     )
@@ -235,8 +259,7 @@ private fun SaveSlotCard(
     title: String,
     subtitle: String,
     bitmap: Bitmap?,
-    primary: @Composable () -> Unit,
-    secondary: @Composable () -> Unit
+    actions: @Composable RowScope.() -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -254,9 +277,12 @@ private fun SaveSlotCard(
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                primary()
-                secondary()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                actions()
             }
         }
     }
@@ -314,15 +340,20 @@ fun CompactActionButton(
 @Composable
 private fun SquareActionButton(
     onClick: () -> Unit,
-    label: String,
+    icon: ImageVector,
+    contentDescription: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     accent: Color = Color(0xFF5D4FA3)
 ) {
+    val haptics = LocalHapticFeedback.current
     Button(
-        onClick = onClick,
+        onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClick()
+        },
         enabled = enabled,
-        modifier = modifier.size(48.dp),
+        modifier = modifier.aspectRatio(1f),
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = accent,
@@ -332,7 +363,11 @@ private fun SquareActionButton(
         ),
         contentPadding = PaddingValues(0.dp)
     ) {
-        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = Color.White
+        )
     }
 }
 

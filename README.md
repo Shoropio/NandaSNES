@@ -9,14 +9,13 @@ Android emulator app backed by the `snes9x` core through JNI. The project uses J
 - Refactored project structure with `presentation`, `data`, `domain`, and `runtime` responsibilities
 - `snes9x` integrated as a Git submodule under `third_party/snes9x`
 
-Important: the current GitHub repository URL may still use the legacy `NandaNes` name until the remote is renamed, but the product branding is now `NandaSNES`.
+Public repository: `https://github.com/Shoropio/NandaSNES`
 
 ## Repository layout
 
 - `android/`: Android Studio project and app module
 - `third_party/snes9x/`: upstream emulator core used by the NDK build
 - `docs/`: project notes and supporting documentation
-- `android-samples/`: auxiliary Android sample material
 
 ## Architecture overview
 
@@ -52,8 +51,8 @@ Important: the current GitHub repository URL may still use the legacy `NandaNes`
 Clone the repository with submodules so the native core is available:
 
 ```bash
-git clone --recurse-submodules <repo-url>
-cd <repo-folder>
+git clone --recurse-submodules https://github.com/Shoropio/NandaSNES.git
+cd NandaSNES
 ```
 
 If you already cloned it without submodules:

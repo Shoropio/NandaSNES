@@ -55,6 +55,13 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
@@ -102,7 +109,7 @@ fun EmulatorOverlay(
         val centerButtonHeight = 40.dp * settings.sizeScale * compactScale
         val shoulderWidth = 112.dp * settings.sizeScale * compactScale
         val shoulderHeight = 48.dp * settings.sizeScale * compactScale
-        val dpadClusterSize = dpadBase * 2.3f
+        val dpadClusterSize = dpadBase * 2.18f
         val actionClusterSize = actionBase * 2.4f
         val menuWidth = 112.dp
         val menuHeight = 52.dp
@@ -410,15 +417,42 @@ fun AboutPanelContent() {
             color = Color(0xFFB3B7C0),
             style = MaterialTheme.typography.bodySmall
         )
+
         Text("Librerias y componentes open source", color = Color.White, style = MaterialTheme.typography.labelLarge)
+
         Text(
             "Snes9x libretro core\nAndroidX Activity Compose\nJetpack Compose UI\nMaterial 3\nKotlin for Android",
             color = Color(0xFFB9C1CC),
             style = MaterialTheme.typography.bodySmall
         )
+
+        Text(
+            buildAnnotatedString {
+                withStyle(
+                    style = SpanStyle(color = Color.White)
+                ) {
+                    append("Código fuente en ")
+                }
+                withLink(
+                    LinkAnnotation.Url(
+                        url = "https://github.com/Shoropio/NandaSNES",
+                        styles = TextLinkStyles(
+                            style = SpanStyle(
+                                color = Color(0xFF64B5F6),
+                                textDecoration = TextDecoration.Underline
+                            )
+                        )
+                    )
+                ) {
+                    append("GitHub")
+                }
+            },
+            style = MaterialTheme.typography.bodySmall
+        )
+
         Text(
             "Las ROMs, consolas y marcas mencionadas pertenecen a sus respectivos propietarios.\n" +
-                    "NandaSNES Inc ni Shoropio Corporation no reclaman derechos sobre dicho contenido ni están afiliados a sus titulares.\n" +
+                    "Ni NandaSNES Inc. ni Shoropio Corporation reclaman derechos sobre dicho contenido ni están afiliados a sus titulares.\n" +
                     "El usuario es responsable de utilizar únicamente contenido que posea legalmente.",
             color = Color(0xFF8E98A7),
             style = MaterialTheme.typography.labelSmall

@@ -2,6 +2,10 @@
 
 `NandaSNES` now supports Android release signing without storing secrets in Git.
 
+Public repository:
+
+`https://github.com/Shoropio/NandaSNES`
+
 ## Option 1: local `keystore.properties`
 
 Create `android/keystore.properties` from the example file:

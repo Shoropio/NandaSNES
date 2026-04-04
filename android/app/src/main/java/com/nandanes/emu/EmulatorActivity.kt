@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -190,6 +191,7 @@ class EmulatorActivity : ComponentActivity() {
                                         onClose = closeSavePanel,
                                         onSave = { slot -> saveManualSlot(state.romId, slot) },
                                         onLoad = { slot -> loadManualSlot(state.romId, slot) },
+                                        onDelete = { slot -> deleteManualSlot(state.romId, slot) },
                                         onLoadAutoSave = { loadAutoSave(state.romId) },
                                         onDeleteAutoSave = {
                                             autoSaveManager.deleteAutoSave(state.romId)
@@ -403,6 +405,25 @@ class EmulatorActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun deleteManualSlot(romId: String, slot: Int) {
+        lifecycleScope.launch {
+            viewModel.setSaveStateProcessing(true)
+            val deleted = withContext(Dispatchers.IO) {
+                saveManager.setActiveRomId(romId)
+                val stateDeleted = saveManager.manualSlotPath(slot).delete()
+                val thumbDeleted = saveManager.manualThumbPath(slot).delete()
+                SaveSlotMetadata.setSlotSavedAtMillis(this@EmulatorActivity, romId, slot, 0L)
+                stateDeleted || thumbDeleted
+            }
+            viewModel.setSaveStateProcessing(false)
+            if (deleted) {
+                viewModel.bumpSlotsRefresh()
+            } else {
+                viewModel.updateImportError("No se pudo borrar el slot")
+            }
+        }
+    }
 }
 
 @Composable
@@ -414,129 +435,199 @@ private fun RomPickerScreen(
     onOpenRecent: (RecentRom) -> Unit,
     onOpenCompatible: (CompatibleRom) -> Unit
 ) {
-    LazyColumn(
+    val showQuickLoadMenu = remember { mutableStateOf(false) }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF090909))
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        item {
-            Spacer(modifier = Modifier.height(32.dp))
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(32.dp))
+                Box(
+                    modifier = Modifier
+                        .border(2.dp, Color(0xFF5D4FA3), RoundedCornerShape(22.dp))
+                        .background(Color(0xFF13161C), RoundedCornerShape(22.dp))
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                ) {
+                    Text("NS", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                Text("NandaSNES", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Emulador de SNES para Android con overlay tactil y guardado rapido.",
+                    color = Color.LightGray
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+                Button(onClick = onPickRom) { Text("Elegir ROM") }
+                if (recentRoms.isNotEmpty() || compatibleRoms.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(onClick = { showQuickLoadMenu.value = true }) { Text("Cargar partida") }
+                }
+                error?.let {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(it, color = Color(0xFFFF7A7A))
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            if (recentRoms.isNotEmpty()) {
+                item {
+                    Text(
+                        "ROMs recientes",
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                items(recentRoms, key = { "recent:${recentKey(it)}" }) { recent ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF171717))
+                    ) {
+                        androidx.compose.foundation.layout.Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(recent.label, color = Color.White, maxLines = 1)
+                                Text(
+                                    SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(recent.lastPlayedAt)),
+                                    color = Color.LightGray,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Button(onClick = { onOpenRecent(recent) }) { Text("Abrir") }
+                        }
+                    }
+                }
+            }
+
+            if (compatibleRoms.isNotEmpty()) {
+                item {
+                    Text(
+                        "ROMs importadas",
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                items(compatibleRoms, key = { "compatible:${compatibleKey(it)}" }) { compatible ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF14161A))
+                    ) {
+                        androidx.compose.foundation.layout.Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(compatible.label, color = Color.White, maxLines = 1)
+                                Text(
+                                    "Importada: ${SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(compatible.lastModified))}",
+                                    color = Color.LightGray,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Button(onClick = { onOpenCompatible(compatible) }) { Text("Abrir") }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF12151B))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Acerca de", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        AboutPanelContent()
+                    }
+                }
+            }
+        }
+
+        if (showQuickLoadMenu.value) {
             Box(
                 modifier = Modifier
-                    .border(2.dp, Color(0xFF5D4FA3), RoundedCornerShape(22.dp))
-                    .background(Color(0xFF13161C), RoundedCornerShape(22.dp))
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-            ) {
-                Text("NN", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
-            }
-            Spacer(modifier = Modifier.height(14.dp))
-            Text("NandaSNES", style = MaterialTheme.typography.headlineMedium, color = Color.White)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "Emulador de SNES para Android con overlay tactil y guardado rapido.",
-                color = Color.LightGray
+                    .fillMaxSize()
+                    .background(Color(0x52000000))
             )
-            Spacer(modifier = Modifier.height(18.dp))
-            Button(onClick = onPickRom) { Text("Elegir ROM") }
-            error?.let {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(it, color = Color(0xFFFF7A7A))
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-        }
-
-        if (recentRoms.isNotEmpty()) {
-            item {
-                Text(
-                    "ROMs recientes",
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            items(recentRoms, key = { "recent:${recentKey(it)}" }) { recent ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF171717))
-                ) {
-                    androidx.compose.foundation.layout.Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(recent.label, color = Color.White, maxLines = 1)
-                            Text(
-                                SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(recent.lastPlayedAt)),
-                                color = Color.LightGray,
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Button(onClick = { onOpenRecent(recent) }) { Text("Abrir") }
-                    }
-                }
-            }
-        }
-
-        if (compatibleRoms.isNotEmpty()) {
-            item {
-                Text(
-                    "Juegos compatibles en el dispositivo",
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            items(compatibleRoms, key = { "compatible:${compatibleKey(it)}" }) { compatible ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF14161A))
-                ) {
-                    androidx.compose.foundation.layout.Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(compatible.label, color = Color.White, maxLines = 1)
-                            Text(
-                                "Compatible: ${SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(compatible.lastModified))}",
-                                color = Color.LightGray,
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Button(onClick = { onOpenCompatible(compatible) }) { Text("Abrir") }
-                    }
-                }
-            }
-        }
-
-        item {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(20.dp)
+                    .fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF12151B))
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("Acerca de", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                    AboutPanelContent()
+                    Text("Cargar partida", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    if (recentRoms.isNotEmpty()) {
+                        Button(
+                            onClick = {
+                                showQuickLoadMenu.value = false
+                                onOpenRecent(recentRoms.first())
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Última ROM reciente")
+                        }
+                    }
+                    if (compatibleRoms.isNotEmpty()) {
+                        Button(
+                            onClick = {
+                                showQuickLoadMenu.value = false
+                                onOpenCompatible(compatibleRoms.first())
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Primera ROM importada")
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            showQuickLoadMenu.value = false
+                            onPickRom()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Buscar otra ROM")
+                    }
+                    Button(
+                        onClick = { showQuickLoadMenu.value = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cerrar")
+                    }
                 }
             }
         }

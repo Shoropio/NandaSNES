@@ -2,6 +2,10 @@
 
 Aplicacion Android del proyecto, construida con Kotlin, Jetpack Compose, NDK y un bridge JNI hacia el core `snes9x`.
 
+Repositorio publico:
+
+`https://github.com/Shoropio/NandaSNES`
+
 ## Estructura actual
 
 ### Presentation
