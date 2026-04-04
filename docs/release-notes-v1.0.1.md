@@ -30,4 +30,3 @@ Cierre de la primera etapa estable y de publicacion de NandaSNES para Android.
 
 - el core emulado actual es SNES basado en `snes9x`
 - se mantuvo el `applicationId` y parte del naming interno para no romper compatibilidad de instalacion ni firma
-- la publicacion de la release en GitHub debe hacerse desde la web porque `gh` no esta instalado en esta maquina
