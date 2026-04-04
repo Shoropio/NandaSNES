@@ -27,6 +27,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,14 +40,18 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -91,11 +97,11 @@ fun EmulatorOverlay(
         val sh = this.maxHeight
         val compactScale = 0.92f
         val actionBase = 66.dp * settings.sizeScale * compactScale
-        val dpadBase = 60.dp * settings.sizeScale * compactScale
-        val centerButtonWidth = 88.dp * settings.sizeScale * compactScale
-        val centerButtonHeight = 38.dp * settings.sizeScale * compactScale
-        val shoulderWidth = 98.dp * settings.sizeScale * compactScale
-        val shoulderHeight = 40.dp * settings.sizeScale * compactScale
+        val dpadBase = 74.dp * settings.sizeScale * compactScale
+        val centerButtonWidth = 90.dp * settings.sizeScale * compactScale
+        val centerButtonHeight = 40.dp * settings.sizeScale * compactScale
+        val shoulderWidth = 112.dp * settings.sizeScale * compactScale
+        val shoulderHeight = 48.dp * settings.sizeScale * compactScale
         val dpadClusterSize = dpadBase * 2.3f
         val actionClusterSize = actionBase * 2.4f
         val menuWidth = 112.dp
@@ -114,7 +120,7 @@ fun EmulatorOverlay(
         )
         val menuAnchor = proportionalAnchor(sw, sh, 0.5f, 0.15f, menuWidth, menuHeight)
         val dpadAlpha = (settings.opacity * settings.dpadOpacity).coerceIn(0.06f, 0.98f)
-        val actionAlpha = (settings.opacity * settings.actionOpacity).coerceIn(0.06f, 1f)
+        val actionAlpha = (settings.opacity * settings.actionOpacity).coerceIn(0.06f, 0.98f)
         val centerAlpha = (settings.opacity * settings.centerOpacity).coerceIn(0.06f, 0.98f)
         val shoulderAlpha = (settings.opacity * settings.shoulderOpacity).coerceIn(0.06f, 0.98f)
 
@@ -588,8 +594,12 @@ private fun FloatingMenuButton(
     active: Boolean,
     onClick: () -> Unit
 ) {
+    val haptics = LocalHapticFeedback.current
     Button(
-        onClick = onClick,
+        onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClick()
+        },
         modifier = modifier,
         shape = RoundedCornerShape(1.dp),
         colors = ButtonDefaults.buttonColors(
@@ -735,6 +745,8 @@ private fun ActionButton(
     )
 }
 
+private enum class DirectionGlyph { UP, LEFT, RIGHT, DOWN }
+
 @Composable
 private fun RetroDpad(
     buttonSize: Dp,
@@ -743,55 +755,98 @@ private fun RetroDpad(
     onPress: (SnesKey) -> Unit,
     onRelease: (SnesKey) -> Unit
 ) {
-    val totalSize = buttonSize * 2.8f // Proporción perfecta para que los brazos toquen el centro
+    val totalSize = buttonSize * 2.18f
+
     Box(modifier = Modifier.size(totalSize)) {
-        // Bloque central que une la cruceta
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(buttonSize * 0.8f)
-                .background(palette.fill.copy(alpha = alpha))
+        DpadButton(
+            DirectionGlyph.UP,
+            SnesKey.UP,
+            onPress,
+            onRelease,
+            palette,
+            alpha,
+            Modifier
+                .align(Alignment.TopCenter)
+                .size(width = buttonSize * 0.92f, height = buttonSize)
         )
-        // Botones con bordes redondeados solo en las puntas exteriores
-        DpadButton(DirectionGlyph.UP, SnesKey.UP, onPress, onRelease, palette, alpha, Modifier.align(Alignment.TopCenter).size(buttonSize))
-        DpadButton(DirectionGlyph.LEFT, SnesKey.LEFT, onPress, onRelease, palette, alpha, Modifier.align(Alignment.CenterStart).size(buttonSize))
-        DpadButton(DirectionGlyph.RIGHT, SnesKey.RIGHT, onPress, onRelease, palette, alpha, Modifier.align(Alignment.CenterEnd).size(buttonSize))
-        DpadButton(DirectionGlyph.DOWN, SnesKey.DOWN, onPress, onRelease, palette, alpha, Modifier.align(Alignment.BottomCenter).size(buttonSize))
+
+        DpadButton(
+            DirectionGlyph.LEFT,
+            SnesKey.LEFT,
+            onPress,
+            onRelease,
+            palette,
+            alpha,
+            Modifier
+                .align(Alignment.CenterStart)
+                .size(width = buttonSize, height = buttonSize * 0.92f)
+        )
+
+        DpadButton(
+            DirectionGlyph.RIGHT,
+            SnesKey.RIGHT,
+            onPress,
+            onRelease,
+            palette,
+            alpha,
+            Modifier
+                .align(Alignment.CenterEnd)
+                .size(width = buttonSize, height = buttonSize * 0.92f)
+        )
+
+        DpadButton(
+            DirectionGlyph.DOWN,
+            SnesKey.DOWN,
+            onPress,
+            onRelease,
+            palette,
+            alpha,
+            Modifier
+                .align(Alignment.BottomCenter)
+                .size(width = buttonSize * 0.92f, height = buttonSize)
+        )
     }
 }
 
-private fun dpadShape(glyph: DirectionGlyph): Shape = when (glyph) {
-    DirectionGlyph.UP -> RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
-    DirectionGlyph.DOWN -> RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp)
-    DirectionGlyph.LEFT -> RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp)
-    DirectionGlyph.RIGHT -> RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)
-}
+private fun dpadShape(glyph: DirectionGlyph): Shape = GenericShape { size, _ ->
+    when (glyph) {
+        DirectionGlyph.UP -> {
+            // plano arriba, punta abajo
+            moveTo(size.width * 0.12f, 0f)
+            lineTo(size.width * 0.88f, 0f)
+            lineTo(size.width * 0.88f, size.height * 0.62f)
+            lineTo(size.width * 0.50f, size.height)
+            lineTo(size.width * 0.12f, size.height * 0.62f)
+        }
 
-private enum class DirectionGlyph { UP, LEFT, RIGHT, DOWN }
+        DirectionGlyph.DOWN -> {
+            // punta arriba, plano abajo
+            moveTo(size.width * 0.12f, size.height)
+            lineTo(size.width * 0.88f, size.height)
+            lineTo(size.width * 0.88f, size.height * 0.38f)
+            lineTo(size.width * 0.50f, 0f)
+            lineTo(size.width * 0.12f, size.height * 0.38f)
+        }
 
-@Composable
-private fun DpadButton(
-    glyph: DirectionGlyph,
-    key: SnesKey,
-    onPress: (SnesKey) -> Unit,
-    onRelease: (SnesKey) -> Unit,
-    palette: ControlSkinPalette,
-    alpha: Float,
-    modifier: Modifier
-) {
-    TouchButton(
-        label = "",
-        key = key,
-        onPress = onPress,
-        onRelease = onRelease,
-        modifier = modifier,
-        shape = dpadShape(glyph),
-        background = palette.fill.copy(alpha = alpha),
-        border = palette.outline.copy(alpha = alpha),
-        chrome = palette.fillPressed.copy(alpha = alpha),
-        textColor = palette.text,
-        overlayContent = { DirectionIcon(glyph, palette.text.copy(alpha = alpha)) }
-    )
+        DirectionGlyph.LEFT -> {
+            // plano izquierda, punta derecha
+            moveTo(0f, size.height * 0.12f)
+            lineTo(size.width * 0.62f, size.height * 0.12f)
+            lineTo(size.width, size.height * 0.50f)
+            lineTo(size.width * 0.62f, size.height * 0.88f)
+            lineTo(0f, size.height * 0.88f)
+        }
+
+        DirectionGlyph.RIGHT -> {
+            // punta izquierda, plano derecha
+            moveTo(size.width, size.height * 0.12f)
+            lineTo(size.width * 0.38f, size.height * 0.12f)
+            lineTo(0f, size.height * 0.50f)
+            lineTo(size.width * 0.38f, size.height * 0.88f)
+            lineTo(size.width, size.height * 0.88f)
+        }
+    }
+    close()
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -811,8 +866,18 @@ private fun TouchButton(
     overlayContent: @Composable (() -> Unit)? = null
 ) {
     var pressed by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.965f else 1f,
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = 720f),
+        label = "overlayTouchScale"
+    )
     Box(
         modifier = modifier
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .clip(shape)
             .background(if (pressed) chrome else background, shape)
             .border(1.dp, border, shape)
@@ -821,6 +886,7 @@ private fun TouchButton(
                     MotionEvent.ACTION_DOWN,
                     MotionEvent.ACTION_POINTER_DOWN -> {
                         pressed = true
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         onPress(key)
                         true
                     }
@@ -886,6 +952,31 @@ private fun proportionalAnchor(
 }
 
 @Composable
+private fun DpadButton(
+    glyph: DirectionGlyph,
+    key: SnesKey,
+    onPress: (SnesKey) -> Unit,
+    onRelease: (SnesKey) -> Unit,
+    palette: ControlSkinPalette,
+    alpha: Float,
+    modifier: Modifier
+) {
+    TouchButton(
+        label = "",
+        key = key,
+        onPress = onPress,
+        onRelease = onRelease,
+        modifier = modifier,
+        shape = dpadShape(glyph),
+        background = palette.fill.copy(alpha = alpha),
+        border = palette.outline.copy(alpha = alpha),
+        chrome = palette.fillPressed.copy(alpha = alpha),
+        textColor = palette.text,
+        overlayContent = { DirectionIcon(glyph, palette.text.copy(alpha = alpha)) }
+    )
+}
+
+@Composable
 private fun DirectionIcon(
     glyph: DirectionGlyph,
     color: Color
@@ -894,23 +985,35 @@ private fun DirectionIcon(
         modifier = Modifier
             .fillMaxSize()
             .drawBehind {
-                val arrowSize = size.minDimension * 0.22f
-                rotate(
-                    degrees = when (glyph) {
-                        DirectionGlyph.UP -> 0f
-                        DirectionGlyph.RIGHT -> 90f
-                        DirectionGlyph.DOWN -> 180f
-                        DirectionGlyph.LEFT -> 270f
-                    },
-                    pivot = center
-                ) {
-                    val path = Path().apply {
-                        moveTo(center.x, center.y - arrowSize)
-                        lineTo(center.x - arrowSize * 0.85f, center.y + arrowSize * 0.65f)
-                        lineTo(center.x + arrowSize * 0.85f, center.y + arrowSize * 0.65f)
-                        close()
-                    }
-                    drawPath(path, color, style = Stroke(width = 1.5.dp.toPx()))
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+
+                val triWidth = size.width * 0.18f
+                val triHeight = size.height * 0.14f
+
+                val triangle = Path().apply {
+                    moveTo(cx, cy - triHeight / 2f)
+                    lineTo(cx - triWidth / 2f, cy + triHeight / 2f)
+                    lineTo(cx + triWidth / 2f, cy + triHeight / 2f)
+                    close()
+                }
+
+                withTransform({
+                    rotate(
+                        degrees = when (glyph) {
+                            DirectionGlyph.UP -> 0f
+                            DirectionGlyph.RIGHT -> 90f
+                            DirectionGlyph.DOWN -> 180f
+                            DirectionGlyph.LEFT -> 270f
+                        },
+                        pivot = Offset(cx, cy)
+                    )
+                }) {
+                    drawPath(
+                        path = triangle,
+                        color = color,
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
                 }
             }
     )
