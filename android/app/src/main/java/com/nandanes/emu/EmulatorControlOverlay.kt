@@ -413,7 +413,7 @@ fun AboutPanelContent() {
         Text("© 2026 NandaSNES Inc.", color = Color.White, style = MaterialTheme.typography.titleSmall)
         Text("Desarrollado por © 2026 Shoropio Corporation.", color = Color(0xFFD7DCE4), style = MaterialTheme.typography.bodyMedium)
         Text(
-            "NandaSNES es una app para emulación de Super Nintendo.",
+            "NandaSNES es un emulador portátil de Super Nintendo Entertainment System (TM).",
             color = Color(0xFFB3B7C0),
             style = MaterialTheme.typography.bodySmall
         )
