@@ -268,7 +268,7 @@ fun EmulatorOverlay(
                             onClick = { panelMode = OverlayPanelMode.EDITOR },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Tune Controls")
+                            Text("Control")
                         }
                         CompactActionButton(
                             onClick = { panelMode = OverlayPanelMode.SAVES },
@@ -316,7 +316,7 @@ fun EmulatorOverlay(
                 OverlayBottomSheet(
                     modifier = Modifier.align(Alignment.BottomCenter),
                     title = "Retro Controls",
-                    subtitle = "Arrastra cada bloque o afina opacidad, tamano y vibracion.",
+                    subtitle = "Arrastra cada bloque o afina opacidad, tamano y vibración.",
                     onDismiss = { panelMode = OverlayPanelMode.NONE }
                 ) {
                     ControlSettingsPanel(settings, onSettingsChange) {
@@ -348,7 +348,7 @@ fun EmulatorOverlay(
                 OverlayBottomSheet(
                     modifier = Modifier.align(Alignment.BottomCenter),
                     title = "Acerca de",
-                    subtitle = "Creditos, derechos de autor y componentes open source.",
+                    subtitle = "Créditos, licencias, derechos de autor y componentes open source.",
                     onDismiss = { panelMode = OverlayPanelMode.MENU }
                 ) {
                     AboutPanelContent()
@@ -403,10 +403,10 @@ private fun OverlayBottomSheet(
 @Composable
 fun AboutPanelContent() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("NandaSNES Inc 2026", color = Color.White, style = MaterialTheme.typography.titleSmall)
-        Text("Desarrollado por Shoropio Corporation 2026", color = Color(0xFFD7DCE4), style = MaterialTheme.typography.bodyMedium)
+        Text("© 2026 NandaSNES Inc.", color = Color.White, style = MaterialTheme.typography.titleSmall)
+        Text("Desarrollado por © 2026 Shoropio Corporation.", color = Color(0xFFD7DCE4), style = MaterialTheme.typography.bodyMedium)
         Text(
-            "NandaSNES es una app para emulacion de Super Nintendo.",
+            "NandaSNES es una app para emulación de Super Nintendo.",
             color = Color(0xFFB3B7C0),
             style = MaterialTheme.typography.bodySmall
         )
@@ -417,7 +417,9 @@ fun AboutPanelContent() {
             style = MaterialTheme.typography.bodySmall
         )
         Text(
-            "Las ROMs, consolas y marcas pertenecen a sus respectivos propietarios. Usa solo contenido que tengas derecho a ejecutar.",
+            "Las ROMs, consolas y marcas mencionadas pertenecen a sus respectivos propietarios.\n" +
+                    "NandaSNES Inc ni Shoropio Corporation no reclaman derechos sobre dicho contenido ni están afiliados a sus titulares.\n" +
+                    "El usuario es responsable de utilizar únicamente contenido que posea legalmente.",
             color = Color(0xFF8E98A7),
             style = MaterialTheme.typography.labelSmall
         )
@@ -539,14 +541,14 @@ private fun ControlSettingsPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Vibracion", color = Color.White)
+            Text("Vibración", color = Color.White)
             Switch(
                 checked = settings.hapticsEnabled,
                 onCheckedChange = { onSettingsChange(settings.copy(hapticsEnabled = it)) }
             )
         }
         if (settings.hapticsEnabled) {
-            LabeledSlider("Intensidad vibracion", settings.hapticsStrength, 0.1f..1f) {
+            LabeledSlider("Intensidad de vibración", settings.hapticsStrength, 0.1f..1f) {
                 onSettingsChange(settings.copy(hapticsStrength = it))
             }
         }
