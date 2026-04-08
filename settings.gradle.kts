@@ -15,5 +15,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "NandaSNES"
-include(":app")
-
+include(":androidApp")
+include(":desktop")
+include(":shared")

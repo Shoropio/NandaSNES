@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project(nandanes)
 
-set(SNES9X_CORE_DIR ${CMAKE_SOURCE_DIR}/../../../../../third_party/snes9x)
+set(SNES9X_CORE_DIR ${CMAKE_SOURCE_DIR}/../../../../third_party/snes9x)
 set(LIBRETRO_COMMON_DIR ${SNES9X_CORE_DIR}/libretro/libretro-common)
 
 set(SNES9X_SOURCES_C

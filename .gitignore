@@ -3,22 +3,36 @@
 Thumbs.db
 Desktop.ini
 
-# Android / IntelliJ generated files
+# Gradle / IntelliJ / Kotlin
+.gradle/
+.idea/
+.kotlin/
+build/
+**/build/
 *.iml
-/android/.gradle/
-/android/.idea/
-/android/.kotlin/
-/android/local.properties
-/android/keystore.properties
-/android/*.jks
-/android/*.keystore
-/android/**/build/
-/android/**/.cxx/
-/android/captures/
+local.properties
+keystore.properties
+*.jks
+*.keystore
 
-# Native and package outputs
+# Native / Build outputs
+/build_windows/
 *.apk
 *.aab
 *.ap_
 *.dex
 *.so
+*.dll
+*.lib
+*.exp
+*.obj
+**/.cxx/
+
+# Temp build files
+*_error.txt
+*_error_utf8.txt
+build_error.txt
+build_error_utf8.txt
+
+# Captures
+captures/
