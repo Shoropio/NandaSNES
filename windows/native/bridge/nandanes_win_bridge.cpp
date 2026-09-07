@@ -269,7 +269,9 @@ void RetroAudioSampleCb(int16_t left, int16_t right) {
 }
 
 size_t RetroAudioSampleBatchCb(const int16_t *data, size_t frames) {
-    AppendAudioSamples(data, frames * 2);
+    if (gAudioQueue.size() < kMaxAudioSamples) {
+        AppendAudioSamples(data, frames * 2);
+    }
     gAudioBatchCount++;
     return frames;
 }
@@ -379,24 +381,46 @@ JNIEXPORT void JNICALL Java_com_nandanes_emu_runtime_NativeBridge_stopEmulation(
 
 JNIEXPORT jintArray JNICALL Java_com_nandanes_emu_runtime_NativeBridge_getFrameArgb8888(JNIEnv *env, jobject thiz) {
     std::lock_guard<std::mutex> lock(gFrameMutex);
-    if (gLastFrameRaw.empty()) return nullptr;
+    if (gLastFrameRaw.empty() || gLastFrameWidth <= 0 || gLastFrameHeight <= 0) return nullptr;
 
-    const int pixelCount = gLastFrameWidth * gLastFrameHeight;
-    std::vector<jint> out(2 + pixelCount);
-    out[0] = gLastFrameWidth;
-    out[1] = gLastFrameHeight;
+    const int width = gLastFrameWidth;
+    const int height = gLastFrameHeight;
+    const int pixelCount = width * height;
+    
+    jintArray result = env->NewIntArray(2 + pixelCount);
+    if (!result) return nullptr;
+
+    std::vector<jint> headerAndPixels(2 + pixelCount);
+    headerAndPixels[0] = width;
+    headerAndPixels[1] = height;
 
     const uint8_t *src = gLastFrameRaw.data();
-    for (int i = 0; i < pixelCount; i++) {
-        uint16_t pixel = reinterpret_cast<const uint16_t *>(src)[i];
-        uint8_t r = ((pixel >> 11) & 0x1F) << 3;
-        uint8_t g = ((pixel >> 5) & 0x3F) << 2;
-        uint8_t b = (pixel & 0x1F) << 3;
-        out[2 + i] = (0xFFu << 24) | (r << 16) | (g << 8) | b;
+    const size_t pitch = gLastFramePitch;
+
+    for (int y = 0; y < height; y++) {
+        const uint16_t *lineSrc = reinterpret_cast<const uint16_t *>(src + y * pitch);
+        for (int x = 0; x < width; x++) {
+            uint16_t pixel = lineSrc[x];
+            uint8_t r, g, b;
+            
+            if (gPixelFormat == RETRO_PIXEL_FORMAT_XRGB8888) {
+                // Not actually 16-bit, but if the core uses it...
+                // But Snes9x usually uses 0RGB1555 or RGB565
+                // Assuming RGB565 for now as it's the most common
+                r = ((pixel >> 11) & 0x1F) << 3;
+                g = ((pixel >> 5) & 0x3F) << 2;
+                b = (pixel & 0x1F) << 3;
+            } else {
+                // Default to RGB565
+                r = ((pixel >> 11) & 0x1F) << 3;
+                g = ((pixel >> 5) & 0x3F) << 2;
+                b = (pixel & 0x1F) << 3;
+            }
+            headerAndPixels[2 + y * width + x] = (0xFFu << 24) | (r << 16) | (g << 8) | b;
+        }
     }
 
-    jintArray result = env->NewIntArray(out.size());
-    env->SetIntArrayRegion(result, 0, out.size(), out.data());
+    env->SetIntArrayRegion(result, 0, 2 + pixelCount, headerAndPixels.data());
     return result;
 }
 
@@ -411,8 +435,25 @@ JNIEXPORT jboolean JNICALL Java_com_nandanes_emu_runtime_NativeBridge_isRomLoade
 JNIEXPORT void JNICALL Java_com_nandanes_emu_runtime_NativeBridge_setDebugLoggingEnabled(JNIEnv *env, jobject thiz, jboolean enabled) { gDebugLoggingEnabled = enabled; }
 JNIEXPORT jstring JNICALL Java_com_nandanes_emu_runtime_NativeBridge_getNativeDebugLog(JNIEnv *env, jobject thiz) { return env->NewStringUTF("Windows Log active"); }
 JNIEXPORT void JNICALL Java_com_nandanes_emu_runtime_NativeBridge_clearNativeDebugLog(JNIEnv *env, jobject thiz) {}
-JNIEXPORT jshortArray JNICALL Java_com_nandanes_emu_runtime_NativeBridge_consumeAudioSamples(JNIEnv *env, jobject thiz, jint maxSamples) { return nullptr; }
-JNIEXPORT jint JNICALL Java_com_nandanes_emu_runtime_NativeBridge_getPendingAudioSamples(JNIEnv *env, jobject thiz) { return 0; }
+JNIEXPORT jshortArray JNICALL Java_com_nandanes_emu_runtime_NativeBridge_consumeAudioSamples(JNIEnv *env, jobject thiz, jint maxSamples) {
+    std::lock_guard<std::mutex> lock(gAudioMutex);
+    int count = std::min((int)gAudioQueue.size(), (int)maxSamples);
+    if (count <= 0) return nullptr;
+
+    jshortArray result = env->NewShortArray(count);
+    std::vector<jshort> tmp(count);
+    for (int i = 0; i < count; i++) {
+        tmp[i] = gAudioQueue.front();
+        gAudioQueue.pop_front();
+    }
+    env->SetShortArrayRegion(result, 0, count, tmp.data());
+    return result;
+}
+
+JNIEXPORT jint JNICALL Java_com_nandanes_emu_runtime_NativeBridge_getPendingAudioSamples(JNIEnv *env, jobject thiz) {
+    std::lock_guard<std::mutex> lock(gAudioMutex);
+    return (jint)gAudioQueue.size();
+}
 JNIEXPORT jint JNICALL Java_com_nandanes_emu_runtime_NativeBridge_getAudioSampleRate(JNIEnv *env, jobject thiz) { return gAudioSampleRate; }
 
 } // extern "C"

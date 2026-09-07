@@ -4,11 +4,10 @@ project(NandaSNES_Windows)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(JAVA_HOME "C:/Users/Shoropio/.antigravity/extensions/redhat.java-1.53.0-win32-x64/jre/21.0.10-win32-x86_64")
-set(JNI_INCLUDE_DIRS "${JAVA_HOME}/include" "${JAVA_HOME}/include/win32")
+find_package(JNI REQUIRED)
 include_directories(${JNI_INCLUDE_DIRS})
 
-set(SNES9X_CORE_DIR ${CMAKE_SOURCE_DIR}/../third_party/snes9x)
+set(SNES9X_CORE_DIR ${CMAKE_SOURCE_DIR}/../../third_party/snes9x)
 set(LIBRETRO_COMMON_DIR ${SNES9X_CORE_DIR}/libretro/libretro-common)
 
 set(SNES9X_SOURCES_C

@@ -37,14 +37,16 @@ fun DesktopVideoSurface(bridge: NativeBridge, modifier: Modifier = Modifier) {
     }
 
     Box(
-        modifier = modifier.background(Color.Black),
+        modifier = modifier.fillMaxSize().background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
         imageBitmap?.let {
             Image(
                 bitmap = it,
                 contentDescription = "Snes Frame",
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(), // Fill the box, but scaling will preserve ratio
+                alignment = Alignment.Center,
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit
             )
         }
     }

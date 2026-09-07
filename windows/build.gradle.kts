@@ -16,6 +16,8 @@ kotlin {
                 implementation(compose.desktop.currentOs)
                 implementation(compose.material3)
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+                implementation("com.badlogicgames.jamepad:jamepad:2.30.0.0")
+                implementation(compose.materialIconsExtended)
                 // We will link the shared brain logic here later
             }
         }
